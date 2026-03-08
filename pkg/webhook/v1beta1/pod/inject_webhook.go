@@ -167,8 +167,13 @@ func (s *SidecarInjector) Mutate(pod *v1.Pod, namespace string) (*v1.Pod, error)
 		return mutatedPod, nil
 	}
 
-	// TrainerStatusCollector watches TrainJob status via K8s API, not shared process namespace
-	isTrainerStatusCollector := trial.Spec.MetricsCollector.Collector.Kind == common.TrainerStatusCollector
+	// TrainerStatusCollector reads TrainJob.status.trainerStatus directly in the controller.
+	// No sidecar needed - this is more efficient than polling through a sidecar.
+	if trial.Spec.MetricsCollector.Collector.Kind == common.TrainerStatusCollector {
+		log.Info("TrainerStatusCollector: skipping sidecar injection (controller reads TrainJob.status directly)",
+			"Trial", jobName)
+		return mutatedPod, nil
+	}
 
 	// Create metrics sidecar container spec
 	injectContainer, err := s.getMetricsCollectorContainer(trial, pod)
@@ -182,11 +187,9 @@ func (s *SidecarInjector) Mutate(pod *v1.Pod, namespace string) (*v1.Pod, error)
 		return nil, err
 	}
 
-	// TrainerStatusCollector doesn't need shared process namespace - it watches TrainJob status via K8s API
-	if !isTrainerStatusCollector {
-		isShareProcessNamespace := true
-		mutatedPod.Spec.ShareProcessNamespace = &isShareProcessNamespace
-	}
+	// Enable shared process namespace for metrics collectors that need it
+	isShareProcessNamespace := true
+	mutatedPod.Spec.ShareProcessNamespace = &isShareProcessNamespace
 
 	mountPath, pathKind := getMountPath(trial.Spec.MetricsCollector)
 	if mountPath != "" {
@@ -313,19 +316,7 @@ func (s *SidecarInjector) getKatibJob(object *unstructured.Unstructured, namespa
 }
 
 func (s *SidecarInjector) getMetricsCollectorArgs(trial *trialsv1beta1.Trial, metricNames string, mc common.MetricsCollectorSpec, metricsCollectorConfigData configv1beta1.MetricsCollectorConfig, esRules []string) ([]string, error) {
-	// TrainerStatusCollector has different arguments - it watches TrainJob status via K8s API
-	if mc.Collector.Kind == common.TrainerStatusCollector {
-		args := []string{
-			"-t", trial.Name,
-			"-m", metricNames,
-			"-s-db", katibmanagerv1beta1.GetDBManagerAddr(),
-			"-trainjob", trial.Name,
-			"-namespace", trial.Namespace,
-			"-poll-interval", "5s",
-		}
-		return args, nil
-	}
-
+	// Note: TrainerStatusCollector doesn't use a sidecar - controller reads TrainJob.status directly
 	args := []string{"-t", trial.Name, "-m", metricNames, "-o-type", string(trial.Spec.Objective.Type), "-s-db", katibmanagerv1beta1.GetDBManagerAddr()}
 
 	if mountPath, _ := getMountPath(mc); mountPath != "" {

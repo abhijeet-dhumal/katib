@@ -44,7 +44,8 @@ func New() ManagerClient {
 
 func (d *DefaultClient) GetTrialObservationLog(
 	instance *trialsv1beta1.Trial) (*api_pb.GetObservationLogReply, error) {
-	// read GetObservationLog call and update observation field
+	// Note: TrainerStatusCollector reads TrainJob.status directly in controller,
+	// it only uses ReportTrialObservationLog for final metrics storage.
 	objectiveMetricName := instance.Spec.Objective.ObjectiveMetricName
 	request := &api_pb.GetObservationLogRequest{
 		TrialName:  instance.Name,
@@ -75,8 +76,8 @@ func (d *DefaultClient) GetTrialObservationLog(
 		}
 		metricLogs = append(metricLogs, reply.ObservationLog.MetricLogs...)
 	}
-	reply.ObservationLog.MetricLogs = metricLogs
 
+	reply.ObservationLog.MetricLogs = metricLogs
 	return reply, nil
 }
 

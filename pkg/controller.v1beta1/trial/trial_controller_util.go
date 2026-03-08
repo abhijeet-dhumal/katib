@@ -24,6 +24,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/reconcile"
 
@@ -146,7 +147,7 @@ func (r *ReconcileTrial) UpdateTrialStatusObservation(instance *trialsv1beta1.Tr
 		}
 		instance.Status.Observation = observation
 
-		// Extract training progress if using TrainerStatus collector
+		// Extract training progress if using TrainerStatus collector (legacy DB-based approach)
 		if instance.Spec.MetricsCollector.Collector.Kind == commonv1beta1.TrainerStatusCollector {
 			trainingProgress := getTrainingProgress(reply.ObservationLog.MetricLogs)
 			if trainingProgress != nil {
@@ -157,7 +158,166 @@ func (r *ReconcileTrial) UpdateTrialStatusObservation(instance *trialsv1beta1.Tr
 	return nil
 }
 
-// getTrainingProgress extracts training progress from metrics reported by TrainerStatus collector
+// reportObservationToDB reports final observation metrics to Katib DB for historical tracking.
+// Used by TrainerStatusCollector to store final metrics when trial completes.
+func (r *ReconcileTrial) reportObservationToDB(instance *trialsv1beta1.Trial, observation *commonv1beta1.Observation) error {
+	if observation == nil || len(observation.Metrics) == 0 {
+		return nil
+	}
+
+	// Convert observation to ObservationLog format
+	observationLog := &api_pb.ObservationLog{
+		MetricLogs: make([]*api_pb.MetricLog, 0, len(observation.Metrics)),
+	}
+
+	timestamp := time.Now().UTC().Format(time.RFC3339)
+	for _, metric := range observation.Metrics {
+		observationLog.MetricLogs = append(observationLog.MetricLogs, &api_pb.MetricLog{
+			TimeStamp: timestamp,
+			Metric: &api_pb.Metric{
+				Name:  metric.Name,
+				Value: metric.Latest,
+			},
+		})
+	}
+
+	// Report to DB Manager
+	_, err := r.ReportTrialObservationLog(instance, observationLog)
+	if err != nil {
+		return fmt.Errorf("failed to report observation log to DB: %w", err)
+	}
+
+	log.Info("Reported final observation to DB", "Trial", instance.Name, "Metrics", len(observation.Metrics))
+	return nil
+}
+
+// getTrainingProgressFromTrainJob extracts TrainingProgress directly from TrainJob.status.trainerStatus.
+// This is the direct read approach - no sidecar or DB needed during training.
+// existingObs is used to maintain historical min/max values across updates.
+func getTrainingProgressFromTrainJob(deployedJob *unstructured.Unstructured, existingObs *commonv1beta1.Observation) (*commonv1beta1.TrainingProgress, *commonv1beta1.Observation) {
+	if deployedJob == nil {
+		return nil, nil
+	}
+
+	// Only process TrainJob resources
+	if deployedJob.GetKind() != "TrainJob" {
+		return nil, nil
+	}
+
+	// Extract status.trainerStatus using unstructured
+	status, found, err := unstructured.NestedMap(deployedJob.Object, "status", "trainerStatus")
+	if err != nil || !found || status == nil {
+		return nil, nil
+	}
+
+	progress := &commonv1beta1.TrainingProgress{}
+
+	// Extract progressPercentage
+	if val, ok := status["progressPercentage"]; ok {
+		switch v := val.(type) {
+		case int64:
+			progress.ProgressPercentage = int32(v)
+		case float64:
+			progress.ProgressPercentage = int32(v)
+		}
+	}
+
+	// Extract estimatedRemainingSeconds
+	if val, ok := status["estimatedRemainingSeconds"]; ok {
+		switch v := val.(type) {
+		case int64:
+			progress.EstimatedRemainingSeconds = v
+		case float64:
+			progress.EstimatedRemainingSeconds = int64(v)
+		}
+	}
+
+	// Extract lastUpdatedTime
+	if val, ok := status["lastUpdatedTime"].(string); ok {
+		progress.LastUpdatedTime = val
+	}
+
+	// Build map of existing metrics for min/max tracking
+	existingMetrics := make(map[string]*commonv1beta1.Metric)
+	if existingObs != nil {
+		for i := range existingObs.Metrics {
+			existingMetrics[existingObs.Metrics[i].Name] = &existingObs.Metrics[i]
+		}
+	}
+
+	// Extract metrics from trainerStatus.metrics
+	var observation *commonv1beta1.Observation
+	if metricsRaw, ok := status["metrics"].([]interface{}); ok && len(metricsRaw) > 0 {
+		observation = &commonv1beta1.Observation{
+			Metrics: []commonv1beta1.Metric{},
+		}
+		for _, m := range metricsRaw {
+			if metricMap, ok := m.(map[string]interface{}); ok {
+				name, _ := metricMap["name"].(string)
+				value, _ := metricMap["value"].(string)
+				if name != "" && value != "" {
+					// Add to progress.CurrentMetrics
+					progress.CurrentMetrics = append(progress.CurrentMetrics, commonv1beta1.Metric{
+						Name:   name,
+						Latest: value,
+					})
+
+					// Update observation with min/max tracking
+					metric := commonv1beta1.Metric{
+						Name:   name,
+						Latest: value,
+						Min:    value,
+						Max:    value,
+					}
+
+					// Merge with existing min/max if available
+					if existing, ok := existingMetrics[name]; ok {
+						metric.Min = minMetricValue(existing.Min, value)
+						metric.Max = maxMetricValue(existing.Max, value)
+					}
+
+					observation.Metrics = append(observation.Metrics, metric)
+				}
+			}
+		}
+	}
+
+	return progress, observation
+}
+
+// minMetricValue returns the smaller of two metric values (as strings representing floats)
+func minMetricValue(a, b string) string {
+	aVal, aErr := strconv.ParseFloat(a, 64)
+	bVal, bErr := strconv.ParseFloat(b, 64)
+	if aErr != nil {
+		return b
+	}
+	if bErr != nil {
+		return a
+	}
+	if aVal < bVal {
+		return a
+	}
+	return b
+}
+
+// maxMetricValue returns the larger of two metric values (as strings representing floats)
+func maxMetricValue(a, b string) string {
+	aVal, aErr := strconv.ParseFloat(a, 64)
+	bVal, bErr := strconv.ParseFloat(b, 64)
+	if aErr != nil {
+		return b
+	}
+	if bErr != nil {
+		return a
+	}
+	if aVal > bVal {
+		return a
+	}
+	return b
+}
+
+// getTrainingProgress extracts training progress from metrics reported by TrainerStatus collector (DB-based, legacy)
 func getTrainingProgress(metricLogs []*api_pb.MetricLog) *commonv1beta1.TrainingProgress {
 	progress := &commonv1beta1.TrainingProgress{}
 	var latestTimestamp *time.Time

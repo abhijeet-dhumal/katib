@@ -247,7 +247,43 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 			return nil
 		}
 
-		// If Job status is succeeded or Trial is early stopped, update Trial observation.
+		// For TrainerStatusCollector: read TrainJob.status.trainerStatus directly (no sidecar needed)
+		if instance.Spec.MetricsCollector.Collector.Kind == commonapiv1beta1.TrainerStatusCollector {
+			// Pass existing observation to maintain min/max tracking across updates
+			trainingProgress, observation := getTrainingProgressFromTrainJob(deployedJob, instance.Status.Observation)
+
+			// Always update TrainingProgress (real-time progress)
+			if trainingProgress != nil {
+				instance.Status.TrainingProgress = trainingProgress
+				logger.V(1).Info("Updated TrainingProgress from TrainJob",
+					"progress", trainingProgress.ProgressPercentage,
+					"metrics", len(trainingProgress.CurrentMetrics))
+			}
+
+			// Always update Observation to track min/max over time
+			if observation != nil {
+				instance.Status.Observation = observation
+			}
+
+			// Report final metrics to DB when job completes
+			if (jobStatus.Condition == trialutil.JobSucceeded || instance.IsEarlyStopped()) && observation != nil {
+				if err := r.reportObservationToDB(instance, observation); err != nil {
+					logger.Error(err, "Failed to report observation to DB")
+					// Continue anyway - observation is already in Trial status
+				}
+			}
+
+			// Update Trial job status condition
+			if err := r.UpdateTrialStatusCondition(instance, deployedJob.GetName(), jobStatus); err != nil {
+				return err
+			}
+
+			// No need for periodic polling - the TrainJob watch triggers reconciliation
+			// when TrainJob.status changes (including trainerStatus updates)
+			return nil
+		}
+
+		// For other collector types: use DB-based observation (original behavior)
 		if jobStatus.Condition == trialutil.JobSucceeded || instance.IsEarlyStopped() {
 			if err = r.UpdateTrialStatusObservation(instance); err != nil {
 				logger.Error(err, "Update trial status observation error")
@@ -256,7 +292,6 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 		}
 
 		// If observation is empty, metrics collector doesn't finish.
-		// For early stopping scenario, metrics collector will report logs before Trial status is changed to EarlyStopped.
 		// We need to requeue reconcile when the Trial is succeeded, metrics collector's type is not `Push`, and metrics are not reported.
 		if jobStatus.Condition == trialutil.JobSucceeded &&
 			instance.Status.Observation == nil &&
@@ -269,7 +304,11 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 		//    if job has succeeded and if observation field is available.
 		//    if job has failed
 		// This will ensure that trial is set to be complete only if metric is collected at least once
-		return r.UpdateTrialStatusCondition(instance, deployedJob.GetName(), jobStatus)
+		if err := r.UpdateTrialStatusCondition(instance, deployedJob.GetName(), jobStatus); err != nil {
+			return err
+		}
+
+		return nil
 	}
 	return nil
 }
