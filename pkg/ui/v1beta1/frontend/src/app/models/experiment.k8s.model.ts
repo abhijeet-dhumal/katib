@@ -185,6 +185,8 @@ export interface TrialProgress {
   estimatedRemainingSeconds?: number;
   currentObjectiveValue?: string;
   status: string;
+  currentStep?: number;
+  totalSteps?: number;
   currentMetrics?: { name: string; latest: string }[];
 }
 

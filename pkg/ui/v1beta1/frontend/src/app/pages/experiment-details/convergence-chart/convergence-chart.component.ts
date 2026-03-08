@@ -24,7 +24,7 @@ import {
 import { TrialProgress } from 'src/app/models/experiment.k8s.model';
 
 interface TrialHistoryPoint {
-  progress: number;
+  step: number;
   metricValue: number;
 }
 
@@ -128,6 +128,11 @@ export class ConvergenceChartComponent implements OnChanges {
       const metricValue = parseFloat(trial.currentObjectiveValue);
       if (isNaN(metricValue)) return;
 
+      // Use currentStep if available, otherwise estimate from progress
+      const step =
+        trial.currentStep ??
+        Math.round((trial.progressPercentage / 100) * (trial.totalSteps || 50));
+
       let history = this.trialHistory.get(trial.trialName);
       if (!history) {
         history = [];
@@ -137,11 +142,11 @@ export class ConvergenceChartComponent implements OnChanges {
       const lastPoint = history[history.length - 1];
       if (
         !lastPoint ||
-        lastPoint.progress !== trial.progressPercentage ||
+        lastPoint.step !== step ||
         Math.abs(lastPoint.metricValue - metricValue) > 1e-10
       ) {
         history.push({
-          progress: trial.progressPercentage,
+          step: step,
           metricValue: metricValue,
         });
       }
@@ -225,11 +230,10 @@ export class ConvergenceChartComponent implements OnChanges {
       },
       xAxis: {
         type: 'value',
-        name: 'Training Progress (%)',
+        name: 'Training Steps',
         nameLocation: 'middle',
         nameGap: 28,
         min: 0,
-        max: 100,
         axisLine: { lineStyle: { color: '#999' } },
         splitLine: { lineStyle: { type: 'dashed', color: '#e0e0e0' } },
       },
@@ -287,7 +291,7 @@ export class ConvergenceChartComponent implements OnChanges {
         ? this.prunedColor
         : this.colors[colorIndex % this.colors.length];
 
-      const data = history.map(point => [point.progress, point.metricValue]);
+      const data = history.map(point => [point.step, point.metricValue]);
 
       series.push({
         name: trialName,
@@ -418,7 +422,7 @@ export class ConvergenceChartComponent implements OnChanges {
   private formatTooltip(params: any): string {
     if (!params || params.length === 0) return '';
 
-    let html = `<b>Progress: ${params[0].data[0]}%</b><br/>`;
+    let html = `<b>Step: ${params[0].data[0]}</b><br/>`;
 
     const sortedParams = [...params].sort((a, b) => {
       const aVal = a.data[1];
