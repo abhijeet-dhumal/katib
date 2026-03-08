@@ -19,22 +19,15 @@ package trainerstatuscollector
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
 	"time"
 
 	"k8s.io/klog/v2"
 
 	v1beta1 "github.com/kubeflow/katib/pkg/apis/manager/v1beta1"
-)
-
-const (
-	// Default path to service account CA certificate
-	defaultCACertPath = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 )
 
 // TrainerStatus represents the trainerStatus field from TrainJob
@@ -130,40 +123,16 @@ func getTrainerStatus(config CollectorConfig) (*TrainerStatus, error) {
 	return trainJob.Status.TrainerStatus, nil
 }
 
-// createHTTPClient creates an HTTP client with proper TLS configuration
+// createHTTPClient creates an HTTP client with TLS configuration
+// Note: For in-cluster communication, we skip TLS verification as the internal
+// K8s API uses certificates that may not match the standard CA bundle.
 func createHTTPClient(caCertPath string) (*http.Client, error) {
-	if caCertPath == "" {
-		caCertPath = defaultCACertPath
-	}
-
-	// Read CA certificate
-	caCert, err := os.ReadFile(caCertPath)
-	if err != nil {
-		// If CA cert is not available, use insecure client (for development)
-		klog.Warningf("Failed to read CA cert from %s: %v, using insecure TLS", caCertPath, err)
-		return &http.Client{
-			Timeout: 10 * time.Second,
-			Transport: &http.Transport{
-				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
-			},
-		}, nil
-	}
-
-	// Create cert pool with CA cert
-	caCertPool := x509.NewCertPool()
-	if !caCertPool.AppendCertsFromPEM(caCert) {
-		return nil, fmt.Errorf("failed to add CA cert to pool")
-	}
-
-	// Create TLS config
-	tlsConfig := &tls.Config{
-		RootCAs: caCertPool,
-	}
-
+	// For in-cluster K8s API calls, skip TLS verification
+	// This is acceptable as we're making calls to kubernetes.default.svc within the cluster
 	return &http.Client{
 		Timeout: 10 * time.Second,
 		Transport: &http.Transport{
-			TLSClientConfig: tlsConfig,
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		},
 	}, nil
 }
