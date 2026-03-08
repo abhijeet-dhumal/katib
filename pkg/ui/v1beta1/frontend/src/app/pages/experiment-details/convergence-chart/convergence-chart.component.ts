@@ -280,17 +280,19 @@ export class ConvergenceChartComponent implements OnChanges {
   }
 
   private createLegendData(): any[] {
-    return Array.from(this.trialHistory.keys()).map(trialName => {
-      const status = this.trialStatuses.get(trialName) || 'Unknown';
-      const isPruned =
-        status === 'EarlyStopped' || status === 'Killed' || status === 'Failed';
-      const isBest = trialName === this.bestTrial;
+    return Array.from(this.trialHistory.keys())
+      .filter(name => !name.endsWith('_marker'))
+      .map(trialName => {
+        const status = this.trialStatuses.get(trialName) || 'Unknown';
+        const isPruned =
+          status === 'EarlyStopped' || status === 'Killed' || status === 'Failed';
+        const isBest = trialName === this.bestTrial;
 
-      return {
-        name: trialName,
-        icon: isPruned ? 'circle' : isBest ? 'diamond' : 'roundRect',
-      };
-    });
+        return {
+          name: trialName,
+          icon: isPruned ? 'circle' : isBest ? 'diamond' : 'roundRect',
+        };
+      });
   }
 
   private createSeries(): any[] {
@@ -309,41 +311,66 @@ export class ConvergenceChartComponent implements OnChanges {
         ? this.prunedColor
         : this.colors[colorIndex % this.colors.length];
 
-      const data = history.map(point => [point.step, point.metricValue]);
+      // Sort data by step to ensure proper line drawing
+      const sortedHistory = [...history].sort((a, b) => a.step - b.step);
+      const data = sortedHistory.map(point => [point.step, point.metricValue]);
 
+      // Only create series if we have data points
+      if (data.length === 0) {
+        if (!isPruned) colorIndex++;
+        return;
+      }
+
+      // Line series for trajectory
       series.push({
         name: trialName,
         type: 'line',
-        smooth: 0.3,
-        showSymbol: true,
-        symbol: isPruned ? 'circle' : isRunning ? 'circle' : 'emptyCircle',
-        symbolSize: isBest ? 8 : isRunning ? 7 : 5,
+        smooth: false,
+        showSymbol: data.length <= 20, // Show symbols only if few points
+        symbol: 'circle',
+        symbolSize: 3,
         lineStyle: {
-          width: isBest ? 3 : isRunning ? 2.5 : 2,
+          width: isBest ? 2.5 : isPruned ? 1.5 : 2,
           type: isPruned ? 'dashed' : 'solid',
           color: baseColor,
         },
         itemStyle: {
           color: baseColor,
-          borderColor: isPruned ? '#fff' : baseColor,
-          borderWidth: isPruned ? 2 : 1,
         },
         data: data,
         z: isBest ? 10 : isPruned ? 1 : 5,
         emphasis: {
           focus: 'series',
           lineStyle: { width: 4 },
-          itemStyle: { borderWidth: 3 },
         },
-        markPoint: this.getMarkPoint(
-          data,
-          isPruned,
-          isRunning,
-          isSucceeded,
-          isBest,
-          baseColor,
-        ),
       });
+
+      // Add endpoint marker
+      if (data.length > 0) {
+        const lastPoint = data[data.length - 1];
+        series.push({
+          name: trialName + '_marker',
+          type: 'scatter',
+          symbol: isPruned ? 'circle' : isRunning ? 'pin' : isBest ? 'diamond' : 'circle',
+          symbolSize: isPruned ? 14 : isRunning ? 20 : isBest ? 16 : 12,
+          itemStyle: {
+            color: isPruned ? this.prunedColor : isRunning ? baseColor : isBest ? '#ffc107' : '#4caf50',
+            borderColor: '#fff',
+            borderWidth: 2,
+          },
+          data: [lastPoint],
+          z: 20,
+          label: {
+            show: isPruned || isBest,
+            formatter: isPruned ? '✕' : isBest ? '★' : '',
+            fontSize: 10,
+            fontWeight: 'bold',
+            color: isPruned ? '#fff' : '#000',
+            position: 'inside',
+          },
+          tooltip: { show: false },
+        });
+      }
 
       if (!isPruned) {
         colorIndex++;
@@ -353,96 +380,16 @@ export class ConvergenceChartComponent implements OnChanges {
     return series;
   }
 
-  private getMarkPoint(
-    data: number[][],
-    isPruned: boolean,
-    isRunning: boolean,
-    isSucceeded: boolean,
-    isBest: boolean,
-    baseColor: string,
-  ): any {
-    if (data.length === 0) return undefined;
-    const lastPoint = data[data.length - 1];
-
-    if (isPruned) {
-      return {
-        symbol: 'circle',
-        symbolSize: 22,
-        data: [
-          {
-            coord: lastPoint,
-            itemStyle: {
-              color: this.prunedColor,
-              borderColor: '#fff',
-              borderWidth: 2,
-            },
-            label: {
-              show: true,
-              formatter: '✕',
-              fontSize: 12,
-              fontWeight: 'bold',
-              color: '#fff',
-            },
-          },
-        ],
-      };
-    }
-
-    if (isRunning) {
-      return {
-        symbol: 'pin',
-        symbolSize: 35,
-        data: [
-          {
-            coord: lastPoint,
-            itemStyle: { color: baseColor },
-            label: {
-              show: true,
-              formatter: (params: any) => {
-                const val = params.data.coord[1];
-                return val < 0.001 ? val.toExponential(1) : val.toFixed(3);
-              },
-              fontSize: 9,
-              color: '#fff',
-            },
-          },
-        ],
-      };
-    }
-
-    if (isSucceeded) {
-      return {
-        symbol: 'circle',
-        symbolSize: isBest ? 20 : 16,
-        data: [
-          {
-            coord: lastPoint,
-            itemStyle: {
-              color: isBest ? '#ffc107' : '#4caf50',
-              borderColor: '#fff',
-              borderWidth: 2,
-            },
-            label: {
-              show: true,
-              formatter: isBest ? '★' : '✓',
-              fontSize: isBest ? 12 : 10,
-              fontWeight: 'bold',
-              color: isBest ? '#000' : '#fff',
-            },
-          },
-        ],
-      };
-    }
-
-    return undefined;
-  }
-
   private formatTooltip(params: any): string {
     if (!params || params.length === 0) return '';
 
-    let html = `<b>Step: ${params[0].data[0]}</b><br/>`;
+    // Filter out marker series
+    const lineParams = params.filter((p: any) => !p.seriesName.endsWith('_marker'));
+    if (lineParams.length === 0) return '';
 
-    const sortedParams = [...params].sort((a, b) => {
+    let html = `<b>Step: ${lineParams[0].data[0]}</b><br/>`;
+
+    const sortedParams = [...lineParams].sort((a, b) => {
       const aVal = a.data[1];
       const bVal = b.data[1];
       return this.objectiveType === 'minimize' ? aVal - bVal : bVal - aVal;
