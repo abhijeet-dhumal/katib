@@ -477,19 +477,36 @@ func getMetrics(metricLogs []*api_pb.MetricLog, strategies []commonv1beta1.Metri
 // Returns true if the trial should be early stopped.
 // This is used by TrainerStatusCollector since it doesn't have a sidecar to evaluate rules.
 func evaluateEarlyStoppingRules(trial *trialsv1beta1.Trial, observation *commonv1beta1.Observation, progress *commonv1beta1.TrainingProgress) bool {
-	if len(trial.Spec.EarlyStoppingRules) == 0 || observation == nil {
+	if len(trial.Spec.EarlyStoppingRules) == 0 {
+		return false
+	}
+	if observation == nil {
 		return false
 	}
 
 	// Get current step from progress (used to check StartStep requirement)
 	currentStep := int32(0)
+	progressPct := int32(0)
 	if progress != nil {
 		currentStep = progress.CurrentStep
+		progressPct = progress.ProgressPercentage
 		// If CurrentStep not available, estimate from progress percentage
 		if currentStep == 0 && progress.TotalSteps > 0 {
 			currentStep = int32(float64(progress.ProgressPercentage) / 100.0 * float64(progress.TotalSteps))
 		}
+		// Fallback: if still 0 but we have progress percentage, use it directly as step proxy
+		// This allows start_step=20 to mean "start at 20% progress" when actual steps aren't available
+		if currentStep == 0 && progress.ProgressPercentage > 0 {
+			currentStep = int32(progress.ProgressPercentage)
+		}
 	}
+
+	log.Info("Evaluating early stopping rules",
+		"Trial", trial.Name,
+		"RulesCount", len(trial.Spec.EarlyStoppingRules),
+		"CurrentStep", currentStep,
+		"ProgressPct", progressPct,
+		"MetricsCount", len(observation.Metrics))
 
 	// Build map of current metrics
 	currentMetrics := make(map[string]float64)
