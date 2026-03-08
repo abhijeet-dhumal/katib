@@ -550,6 +550,10 @@ func (g *DefaultValidator) validateMetricsCollector(inst *experimentsv1beta1.Exp
 					"", ".spec.metricsCollectorSpec.source is invalid"))
 			}
 		}
+	case commonapiv1beta1.TrainerStatusCollector:
+		// TrainerStatusCollector reads metrics from TrainJob.status.trainerStatus
+		// No additional validation required - the collector watches TrainJob via K8s API
+		return allErrs
 	default:
 		allErrs = append(allErrs, field.Invalid(metricsCollectorPath.Child("collector").Child("kind"),
 			mcKind, fmt.Sprintf("invalid metrics collector kind: %v", mcKind)))
