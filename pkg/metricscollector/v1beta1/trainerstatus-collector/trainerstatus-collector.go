@@ -32,7 +32,7 @@ import (
 // TrainerStatus represents the trainerStatus field from TrainJob
 type TrainerStatus struct {
 	ProgressPercentage        int32    `json:"progressPercentage,omitempty"`
-	EstimatedRemainingSeconds int32    `json:"estimatedRemainingSeconds,omitempty"`
+	EstimatedRemainingSeconds int64    `json:"estimatedRemainingSeconds,omitempty"`
 	LastUpdatedTime           string   `json:"lastUpdatedTime,omitempty"`
 	Metrics                   []Metric `json:"metrics,omitempty"`
 }
