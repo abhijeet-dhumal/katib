@@ -257,8 +257,13 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 			logger.Error(err, "GetDeployedJobStatus error")
 		}
 
-		// Not needed to update status if jobStatus is nil.
+		// For TrainerStatusCollector, still try to read progress even if jobStatus is nil
+		// This handles the case where TrainJob exists but hasn't reported status yet
 		if jobStatus == nil {
+			if instance.Spec.MetricsCollector.Collector.Kind == commonapiv1beta1.TrainerStatusCollector {
+				// Requeue to poll for status updates
+				return errTrainerStatusPolling
+			}
 			return nil
 		}
 
