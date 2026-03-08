@@ -247,13 +247,7 @@ func getTrainingProgressFromTrainJob(deployedJob *unstructured.Unstructured, exi
 
 	// Extract metrics from trainerStatus.metrics
 	var observation *commonv1beta1.Observation
-	metricsRaw, metricsOk := status["metrics"].([]interface{})
-	log.Info("getTrainingProgressFromTrainJob debug",
-		"job", deployedJob.GetName(),
-		"hasMetrics", metricsOk,
-		"metricsLen", len(metricsRaw),
-		"progressPct", progress.ProgressPercentage)
-	if metricsOk && len(metricsRaw) > 0 {
+	if metricsRaw, ok := status["metrics"].([]interface{}); ok && len(metricsRaw) > 0 {
 		observation = &commonv1beta1.Observation{
 			Metrics: []commonv1beta1.Metric{},
 		}

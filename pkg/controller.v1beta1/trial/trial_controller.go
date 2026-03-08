@@ -286,26 +286,12 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 			}
 
 			// If job status not available yet, requeue to poll for updates
-			logger.Info("Job status check",
-				"jobStatusNil", jobStatus == nil,
-				"hasMetrics", observation != nil)
 			if jobStatus == nil {
 				return errTrainerStatusPolling
 			}
 
 			// Evaluate early stopping rules during training
 			// For TrainerStatusCollector, we handle this in the controller since there's no sidecar
-			obsMetricsCount := 0
-			if observation != nil {
-				obsMetricsCount = len(observation.Metrics)
-			}
-			logger.Info("Checking early stopping condition",
-				"jobStatusNil", jobStatus == nil,
-				"jobCondition", func() string { if jobStatus != nil { return string(jobStatus.Condition) }; return "nil" }(),
-				"observationNil", observation == nil,
-				"observationMetrics", obsMetricsCount,
-				"rulesCount", len(instance.Spec.EarlyStoppingRules),
-				"progressPct", func() int32 { if trainingProgress != nil { return trainingProgress.ProgressPercentage }; return -1 }())
 			if jobStatus != nil && jobStatus.Condition == trialutil.JobRunning && observation != nil {
 				if evaluateEarlyStoppingRules(instance, observation, trainingProgress) {
 					logger.Info("Early stopping rule triggered, stopping trial")
