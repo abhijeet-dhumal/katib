@@ -1,0 +1,74 @@
+---
+# Experiment using TrainerStatusCollector with Kubeflow TrainJob
+# This tests the integration between Katib and Kubeflow Trainer's progress tracking
+apiVersion: kubeflow.org/v1beta1
+kind: Experiment
+metadata:
+  namespace: kubeflow
+  name: trainerstatus-e2e
+spec:
+  objective:
+    type: minimize
+    goal: 0.5
+    objectiveMetricName: loss
+    additionalMetricNames:
+      - progress_percentage
+      - estimated_remaining_seconds
+  metricsCollectorSpec:
+    collector:
+      kind: TrainerStatus
+  algorithm:
+    algorithmName: random
+  parallelTrialCount: 1
+  maxTrialCount: 2
+  maxFailedTrialCount: 1
+  parameters:
+    - name: lr
+      parameterType: double
+      feasibleSpace:
+        min: "0.001"
+        max: "0.01"
+  trialTemplate:
+    primaryContainerName: node
+    trialParameters:
+      - name: learningRate
+        description: Learning rate for the training model
+        reference: lr
+    trialSpec:
+      apiVersion: trainer.kubeflow.org/v1alpha1
+      kind: TrainJob
+      spec:
+        runtimeRef:
+          name: torch-progress-test
+        trainer:
+          image: ghcr.io/kubeflow/trainer/pytorch-mnist:latest
+          command:
+            - python3
+            - -c
+            - |
+              import os
+              import time
+              import json
+              from datetime import datetime
+              
+              # Simulate training with progress reporting
+              total_steps = 10
+              for step in range(total_steps):
+                  progress = int((step + 1) / total_steps * 100)
+                  loss = 1.0 - (step * 0.08)  # Decreasing loss
+                  
+                  # Print metrics in a format the trainer can capture
+                  print(f"Step {step+1}/{total_steps}, loss={loss:.4f}")
+                  time.sleep(2)
+              
+              print("Training complete!")
+          env:
+            - name: KUBEFLOW_TRAINING_ENABLED
+              value: "true"
+            - name: LR
+              value: "${trialParameters.learningRate}"
+          numNodes: 1
+          resourcesPerNode:
+            requests:
+              cpu: "100m"
+              memory: "256Mi"
