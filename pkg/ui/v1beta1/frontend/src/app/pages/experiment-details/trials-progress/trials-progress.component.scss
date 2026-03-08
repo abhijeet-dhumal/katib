@@ -1,0 +1,199 @@
+/*
+Copyright 2024 The Kubeflow Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
+.trials-progress-container {
+  padding: 16px;
+  background: #fafafa;
+  border-radius: 8px;
+  margin-bottom: 16px;
+
+  .section-title {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 16px 0;
+    font-size: 16px;
+    font-weight: 500;
+    color: #333;
+
+    mat-icon {
+      color: #1976d2;
+    }
+  }
+
+  .trials-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .trial-card {
+    background: white;
+    border-radius: 8px;
+    padding: 12px 16px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    transition: box-shadow 0.2s ease;
+
+    &:hover {
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    &.status-running {
+      border-left: 4px solid #1976d2;
+    }
+
+    &.status-succeeded {
+      border-left: 4px solid #4caf50;
+    }
+
+    &.status-failed {
+      border-left: 4px solid #f44336;
+    }
+
+    &.status-earlystopped {
+      border-left: 4px solid #ff9800;
+    }
+
+    &.status-killed {
+      border-left: 4px solid #9e9e9e;
+    }
+
+    &.status-pending {
+      border-left: 4px solid #9e9e9e;
+    }
+  }
+
+  .trial-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .trial-name {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+
+    mat-icon {
+      font-size: 20px;
+      width: 20px;
+      height: 20px;
+
+      &.status-running {
+        color: #1976d2;
+      }
+      &.status-succeeded {
+        color: #4caf50;
+      }
+      &.status-failed {
+        color: #f44336;
+      }
+      &.status-earlystopped {
+        color: #ff9800;
+      }
+      &.status-killed,
+      &.status-pending {
+        color: #9e9e9e;
+      }
+    }
+
+    .name {
+      font-weight: 500;
+      color: #333;
+      font-size: 14px;
+    }
+  }
+
+  .trial-metrics {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+
+    .metric-value {
+      font-family: 'Roboto Mono', monospace;
+      font-size: 13px;
+      color: #666;
+      background: #f5f5f5;
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+
+    .progress-percent {
+      font-weight: 600;
+      font-size: 14px;
+      color: #1976d2;
+      min-width: 45px;
+      text-align: right;
+    }
+  }
+
+  mat-progress-bar {
+    height: 8px;
+    border-radius: 4px;
+  }
+
+  .trial-footer {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 8px;
+  }
+
+  .status-badge {
+    font-size: 11px;
+    text-transform: uppercase;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 500;
+
+    &.status-running {
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+    &.status-succeeded {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+    &.status-failed {
+      background: #ffebee;
+      color: #c62828;
+    }
+    &.status-earlystopped {
+      background: #fff3e0;
+      color: #e65100;
+    }
+    &.status-killed,
+    &.status-pending {
+      background: #fafafa;
+      color: #616161;
+    }
+  }
+
+  .no-progress {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 24px;
+    color: #999;
+
+    mat-icon {
+      font-size: 24px;
+      width: 24px;
+      height: 24px;
+    }
+  }
+}

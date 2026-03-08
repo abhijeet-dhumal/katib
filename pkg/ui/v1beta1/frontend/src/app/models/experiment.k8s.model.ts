@@ -110,7 +110,8 @@ export type CollectorKind =
   | 'TensorFlowEvent'
   | 'PrometheusMetric'
   | 'Custom'
-  | 'Push';
+  | 'Push'
+  | 'TrainerStatus';
 
 export interface HttpGet {
   host?: string;
@@ -177,6 +178,24 @@ interface CurrentOptimalTrial {
   };
 }
 
+// TrialProgress represents training progress for a single trial
+export interface TrialProgress {
+  trialName: string;
+  progressPercentage: number;
+  currentObjectiveValue?: string;
+  status: string;
+}
+
+// TrainingProgress represents real-time training progress from TrainJob's trainerStatus
+export interface TrainingProgress {
+  progressPercentage: number;
+  estimatedRemainingSeconds?: number;
+  currentStep?: number;
+  totalSteps?: number;
+  lastUpdatedTime?: string;
+  currentMetrics?: { name: string; latest: string }[];
+}
+
 interface ExperimentStatus {
   startTime: string;
   completionTime: string;
@@ -187,4 +206,5 @@ interface ExperimentStatus {
   failedTrialList: string[];
   trials: number;
   trialsSucceeded: number;
+  trialsProgress?: TrialProgress[];
 }

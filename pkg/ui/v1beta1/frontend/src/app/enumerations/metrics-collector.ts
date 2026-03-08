@@ -5,4 +5,5 @@ export enum CollectorKind {
   PROMETHEUS = 'PrometheusMetric',
   CUSTOM = 'Custom',
   PUSH = 'Push',
+  TRAINERSTATUS = 'TrainerStatus',
 }

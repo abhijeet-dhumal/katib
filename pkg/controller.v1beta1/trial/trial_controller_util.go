@@ -186,8 +186,8 @@ func getTrainingProgress(metricLogs []*api_pb.MetricLog) *commonv1beta1.Training
 				progress.ProgressPercentage = int32(val)
 			}
 		case "estimated_remaining_seconds":
-			if val, err := strconv.ParseInt(metricValue, 10, 32); err == nil {
-				progress.EstimatedRemainingSeconds = int32(val)
+			if val, err := strconv.ParseInt(metricValue, 10, 64); err == nil {
+				progress.EstimatedRemainingSeconds = val
 			}
 		case "current_step":
 			if val, err := strconv.ParseInt(metricValue, 10, 32); err == nil {

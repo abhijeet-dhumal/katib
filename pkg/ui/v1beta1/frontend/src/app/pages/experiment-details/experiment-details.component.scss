@@ -7,6 +7,29 @@
   margin: 16px 0;
 }
 
+// KEP-2779: Real-time progress section
+.progress-section {
+  margin: 16px 0;
+
+  .progress-row {
+    display: grid;
+    grid-template-columns: 1fr 2fr;
+    gap: 16px;
+
+    @media (max-width: 1200px) {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  .trials-progress {
+    min-width: 300px;
+  }
+
+  .convergence-chart {
+    min-width: 400px;
+  }
+}
+
 // https://github.com/angular/components/issues/9592
 .tab-height-fix {
   min-height: calc(100vh - 600px - 52px);

@@ -10,6 +10,7 @@
           <mat-option [value]="kind.PROMETHEUS">Prometheus</mat-option>
           <mat-option [value]="kind.CUSTOM">Custom</mat-option>
           <mat-option [value]="kind.PUSH">Push</mat-option>
+          <mat-option [value]="kind.TRAINERSTATUS">TrainerStatus (Kubeflow Trainer)</mat-option>
         </mat-select>
       </mat-form-field>
 
@@ -126,6 +127,20 @@
           <a
             href="https://github.com/kubeflow/katib/blob/master/examples/v1beta1/metrics-collector/custom-metrics-collector.yaml#L15-L35"
             >custom metrics collector example</a
+          >.
+        </lib-step-info>
+      </ng-container>
+
+      <ng-container *ngSwitchCase="kind.TRAINERSTATUS">
+        <lib-step-info header="TrainerStatus (Kubeflow Trainer)">
+          Katib reads metrics directly from the TrainJob's status.trainerStatus field.
+          No sidecar container is needed - metrics flow through the Kubernetes API.
+          Use this when your trial spec creates a Kubeflow TrainJob. The training script
+          should use HuggingFace Transformers with KUBEFLOW_TRAINING_ENABLED=true or
+          the Kubeflow SDK's StatusReporter. Check the
+          <a
+            href="https://github.com/kubeflow/katib/blob/master/examples/v1beta1/kubeflow-trainer/trainjob-pytorch.yaml"
+            >TrainJob example</a
           >.
         </lib-step-info>
       </ng-container>

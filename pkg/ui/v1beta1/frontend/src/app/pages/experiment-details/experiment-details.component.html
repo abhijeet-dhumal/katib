@@ -20,6 +20,24 @@
 </div>
 
 <ng-template #content>
+  <!-- Real-time Progress Section (KEP-2779) -->
+  <div class="progress-section" *ngIf="hasTrialsProgress">
+    <div class="progress-row">
+      <app-trials-progress
+        [trialsProgress]="experimentDetails?.status?.trialsProgress"
+        [objectiveType]="experimentDetails?.spec?.objective?.type"
+        class="trials-progress"
+      ></app-trials-progress>
+
+      <app-convergence-chart
+        [trialsProgress]="experimentDetails?.status?.trialsProgress"
+        [objectiveMetricName]="experimentDetails?.spec?.objective?.objectiveMetricName"
+        [objectiveType]="experimentDetails?.spec?.objective?.type"
+        class="convergence-chart"
+      ></app-convergence-chart>
+    </div>
+  </div>
+
   <app-trials-graph-echarts
     *ngIf="showGraph; else emptyGraph"
     [experimentTrialsCsv]="experimentTrialsCsv"

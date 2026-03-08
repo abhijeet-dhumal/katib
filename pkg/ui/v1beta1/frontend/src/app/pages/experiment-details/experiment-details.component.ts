@@ -44,6 +44,21 @@ export class ExperimentDetailsComponent implements OnInit, OnDestroy {
     ['yaml', 3],
   ]);
 
+  // KEP-2779: Real-time progress tracking
+  get hasTrialsProgress(): boolean {
+    return (
+      this.experimentDetails?.status?.trialsProgress?.length > 0 ||
+      this.isUsingTrainerStatusCollector
+    );
+  }
+
+  get isUsingTrainerStatusCollector(): boolean {
+    return (
+      this.experimentDetails?.spec?.metricsCollectorSpec?.collector?.kind ===
+      'TrainerStatus'
+    );
+  }
+
   constructor(
     private activatedRoute: ActivatedRoute,
     private router: Router,

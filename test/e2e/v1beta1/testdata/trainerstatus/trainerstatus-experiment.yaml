@@ -41,7 +41,7 @@ spec:
         runtimeRef:
           name: torch-progress-test
         trainer:
-          image: ghcr.io/kubeflow/trainer/pytorch-mnist:latest
+          image: python:3.11-slim
           command:
             - python3
             - -c
@@ -49,16 +49,58 @@ spec:
               import os
               import time
               import json
+              import ssl
+              import urllib.request
               from datetime import datetime
               
-              # Simulate training with progress reporting
               total_steps = 10
+              lr = float(os.environ.get('LR', '0.01'))
+              
+              # Get progress endpoint from env (injected by Trainer webhook)
+              progress_endpoint = os.environ.get('TRAINER_PROGRESS_ENDPOINT', '')
+              token_path = os.environ.get('TRAINER_PROGRESS_TOKEN_PATH', '/var/run/secrets/kubernetes.io/serviceaccount/token')
+              
+              def report_progress(progress_pct, loss, step, total, remaining_secs=None):
+                  if not progress_endpoint:
+                      print(f"[DEBUG] No TRAINER_PROGRESS_ENDPOINT, skipping POST")
+                      return
+                  try:
+                      with open(token_path, 'r') as f:
+                          token = f.read().strip()
+                      payload = {
+                          "progressPercentage": progress_pct,
+                          "metrics": [
+                              {"name": "loss", "value": f"{loss:.4f}"},
+                              {"name": "current_step", "value": str(step)},
+                              {"name": "total_steps", "value": str(total)},
+                          ]
+                      }
+                      if remaining_secs is not None:
+                          payload["estimatedRemainingSeconds"] = remaining_secs
+                      data = json.dumps(payload).encode('utf-8')
+                      req = urllib.request.Request(
+                          progress_endpoint, data=data,
+                          headers={'Content-Type': 'application/json', 'Authorization': f'Bearer {token}'},
+                          method='POST'
+                      )
+                      ctx = ssl.create_default_context()
+                      ctx.check_hostname = False
+                      ctx.verify_mode = ssl.CERT_NONE
+                      with urllib.request.urlopen(req, context=ctx, timeout=10) as resp:
+                          print(f"[PROGRESS] Reported {progress_pct}%: {resp.status}")
+                  except Exception as e:
+                      print(f"[WARN] Failed to report progress: {e}")
+              
+              print(f"Starting training with LR={lr}, total_steps={total_steps}")
+              print(f"Progress endpoint: {progress_endpoint or 'NOT SET'}")
+              
               for step in range(total_steps):
                   progress = int((step + 1) / total_steps * 100)
-                  loss = 1.0 - (step * 0.08)  # Decreasing loss
+                  loss = 1.0 - (step * 0.08) - (lr * 10)
+                  remaining = int((total_steps - step - 1) * 2)
                   
-                  # Print metrics in a format the trainer can capture
-                  print(f"Step {step+1}/{total_steps}, loss={loss:.4f}")
+                  print(f"Step {step+1}/{total_steps}: loss={loss:.4f}, progress={progress}%")
+                  report_progress(progress, loss, step + 1, total_steps, remaining)
                   time.sleep(2)
               
               print("Training complete!")

@@ -169,8 +169,8 @@ type TrainingProgress struct {
 	// Current progress percentage (0-100)
 	ProgressPercentage int32 `json:"progressPercentage,omitempty"`
 
-	// Estimated remaining time in seconds
-	EstimatedRemainingSeconds int32 `json:"estimatedRemainingSeconds,omitempty"`
+	// Estimated remaining time in seconds (matches TrainJob CRD int64 type)
+	EstimatedRemainingSeconds int64 `json:"estimatedRemainingSeconds,omitempty"`
 
 	// Current training step/iteration
 	CurrentStep int32 `json:"currentStep,omitempty"`

@@ -1,0 +1,63 @@
+<!--
+Copyright 2024 The Kubeflow Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+-->
+
+<div class="trials-progress-container" *ngIf="sortedTrials?.length > 0">
+  <h3 class="section-title">
+    <mat-icon>trending_up</mat-icon>
+    Training Progress
+  </h3>
+
+  <div class="trials-list">
+    <div
+      *ngFor="let trial of sortedTrials; trackBy: trackByTrialName"
+      class="trial-card"
+      [class]="getStatusClass(trial.status)"
+    >
+      <div class="trial-header">
+        <div class="trial-name">
+          <mat-icon [class]="getStatusClass(trial.status)">
+            {{ getStatusIcon(trial.status) }}
+          </mat-icon>
+          <span class="name">{{ trial.trialName }}</span>
+        </div>
+        <div class="trial-metrics">
+          <span class="metric-value" *ngIf="trial.currentObjectiveValue">
+            {{ trial.currentObjectiveValue }}
+          </span>
+          <span class="progress-percent">{{ trial.progressPercentage }}%</span>
+        </div>
+      </div>
+
+      <mat-progress-bar
+        [mode]="trial.status === 'Running' ? 'buffer' : 'determinate'"
+        [value]="trial.progressPercentage"
+        [bufferValue]="trial.progressPercentage + 5"
+        [color]="getProgressColor(trial.progressPercentage)"
+      ></mat-progress-bar>
+
+      <div class="trial-footer">
+        <span class="status-badge" [class]="getStatusClass(trial.status)">
+          {{ trial.status }}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <div class="no-progress" *ngIf="sortedTrials?.length === 0">
+    <mat-icon>hourglass_empty</mat-icon>
+    <span>No training progress data available</span>
+  </div>
+</div>
