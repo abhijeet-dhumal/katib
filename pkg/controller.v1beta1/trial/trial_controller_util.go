@@ -145,6 +145,75 @@ func (r *ReconcileTrial) UpdateTrialStatusObservation(instance *trialsv1beta1.Tr
 			return err
 		}
 		instance.Status.Observation = observation
+
+		// Extract training progress if using TrainerStatus collector
+		if instance.Spec.MetricsCollector.Collector.Kind == commonv1beta1.TrainerStatusCollector {
+			trainingProgress := getTrainingProgress(reply.ObservationLog.MetricLogs)
+			if trainingProgress != nil {
+				instance.Status.TrainingProgress = trainingProgress
+			}
+		}
+	}
+	return nil
+}
+
+// getTrainingProgress extracts training progress from metrics reported by TrainerStatus collector
+func getTrainingProgress(metricLogs []*api_pb.MetricLog) *commonv1beta1.TrainingProgress {
+	progress := &commonv1beta1.TrainingProgress{}
+	var latestTimestamp *time.Time
+	currentMetrics := make(map[string]string)
+
+	for _, metricLog := range metricLogs {
+		metricName := metricLog.Metric.Name
+		metricValue := metricLog.Metric.Value
+
+		// Parse timestamp to find the latest metrics
+		logTime, err := time.Parse(time.RFC3339Nano, metricLog.TimeStamp)
+		if err != nil {
+			continue
+		}
+
+		// Track latest timestamp
+		if latestTimestamp == nil || logTime.After(*latestTimestamp) {
+			latestTimestamp = &logTime
+			progress.LastUpdatedTime = metricLog.TimeStamp
+		}
+
+		// Extract progress-specific metrics
+		switch metricName {
+		case "progress_percentage":
+			if val, err := strconv.ParseInt(metricValue, 10, 32); err == nil {
+				progress.ProgressPercentage = int32(val)
+			}
+		case "estimated_remaining_seconds":
+			if val, err := strconv.ParseInt(metricValue, 10, 32); err == nil {
+				progress.EstimatedRemainingSeconds = int32(val)
+			}
+		case "current_step":
+			if val, err := strconv.ParseInt(metricValue, 10, 32); err == nil {
+				progress.CurrentStep = int32(val)
+			}
+		case "total_steps":
+			if val, err := strconv.ParseInt(metricValue, 10, 32); err == nil {
+				progress.TotalSteps = int32(val)
+			}
+		default:
+			// Store other metrics as current metrics
+			currentMetrics[metricName] = metricValue
+		}
+	}
+
+	// Convert current metrics to slice
+	for name, value := range currentMetrics {
+		progress.CurrentMetrics = append(progress.CurrentMetrics, commonv1beta1.Metric{
+			Name:   name,
+			Latest: value,
+		})
+	}
+
+	// Only return if we have progress data
+	if progress.ProgressPercentage > 0 || progress.LastUpdatedTime != "" {
+		return progress
 	}
 	return nil
 }

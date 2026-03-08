@@ -65,6 +65,7 @@ func updateTrialsSummary(instance *experimentsv1beta1.Experiment, trials *trials
 	sts.KilledTrialList = nil
 	sts.EarlyStoppedTrialList = nil
 	sts.MetricsUnavailableTrialList = nil
+	sts.TrialsProgress = nil
 	bestTrialIndex := -1
 	isObjectiveGoalReached := false
 	var objectiveValueGoal float64
@@ -75,20 +76,45 @@ func updateTrialsSummary(instance *experimentsv1beta1.Experiment, trials *trials
 
 	for index, trial := range trials.Items {
 		sts.Trials++
+		trialStatus := ""
 		if trial.IsKilled() {
 			sts.KilledTrialList = append(sts.KilledTrialList, trial.Name)
+			trialStatus = "Killed"
 		} else if trial.IsFailed() {
 			sts.FailedTrialList = append(sts.FailedTrialList, trial.Name)
+			trialStatus = "Failed"
 		} else if trial.IsSucceeded() {
 			sts.SucceededTrialList = append(sts.SucceededTrialList, trial.Name)
+			trialStatus = "Succeeded"
 		} else if trial.IsEarlyStopped() {
 			sts.EarlyStoppedTrialList = append(sts.EarlyStoppedTrialList, trial.Name)
+			trialStatus = "EarlyStopped"
 		} else if trial.IsRunning() {
 			sts.RunningTrialList = append(sts.RunningTrialList, trial.Name)
+			trialStatus = "Running"
 		} else if trial.IsMetricsUnavailable() {
 			sts.MetricsUnavailableTrialList = append(sts.MetricsUnavailableTrialList, trial.Name)
+			trialStatus = "MetricsUnavailable"
 		} else {
 			sts.PendingTrialList = append(sts.PendingTrialList, trial.Name)
+			trialStatus = "Pending"
+		}
+
+		// Populate TrialsProgress for trials with training progress data
+		if trial.Status.TrainingProgress != nil || trial.IsRunning() {
+			trialProgress := commonv1beta1.TrialProgress{
+				TrialName: trial.Name,
+				Status:    trialStatus,
+			}
+			if trial.Status.TrainingProgress != nil {
+				trialProgress.ProgressPercentage = trial.Status.TrainingProgress.ProgressPercentage
+			}
+			// Get current objective value if available
+			objectiveValue := getObjectiveMetricValue(trial)
+			if objectiveValue != consts.UnavailableMetricValue {
+				trialProgress.CurrentObjectiveValue = objectiveValue
+			}
+			sts.TrialsProgress = append(sts.TrialsProgress, trialProgress)
 		}
 
 		objectiveMetricValueStr := getObjectiveMetricValue(trial)
