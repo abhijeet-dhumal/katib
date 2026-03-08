@@ -260,17 +260,8 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 			logger.Error(err, "GetDeployedJobStatus error")
 		}
 
-		// For TrainerStatusCollector, still try to read progress even if jobStatus is nil
-		// This handles the case where TrainJob exists but hasn't reported status yet
-		if jobStatus == nil {
-			if instance.Spec.MetricsCollector.Collector.Kind == commonapiv1beta1.TrainerStatusCollector {
-				// Requeue to poll for status updates
-				return errTrainerStatusPolling
-			}
-			return nil
-		}
-
 		// For TrainerStatusCollector: read TrainJob.status.trainerStatus directly (no sidecar needed)
+		// Do this BEFORE checking jobStatus so we can update progress even when job status is unknown
 		if instance.Spec.MetricsCollector.Collector.Kind == commonapiv1beta1.TrainerStatusCollector {
 			// Pass existing observation to maintain min/max tracking across updates
 			trainingProgress, observation := getTrainingProgressFromTrainJob(deployedJob, instance.Status.Observation)
@@ -288,6 +279,11 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 			// Always update Observation to track min/max over time
 			if observation != nil {
 				instance.Status.Observation = observation
+			}
+
+			// If job status not available yet, requeue to poll for updates
+			if jobStatus == nil {
+				return errTrainerStatusPolling
 			}
 
 			// Report final metrics to DB when job completes
@@ -308,6 +304,11 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 			if jobStatus.Condition == trialutil.JobRunning {
 				return errTrainerStatusPolling
 			}
+			return nil
+		}
+
+		// For other collector types, skip if jobStatus is nil
+		if jobStatus == nil {
 			return nil
 		}
 
