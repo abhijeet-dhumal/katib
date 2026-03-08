@@ -292,6 +292,11 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 
 			// Evaluate early stopping rules during training
 			// For TrainerStatusCollector, we handle this in the controller since there's no sidecar
+			logger.Info("Checking early stopping condition",
+				"jobStatusNil", jobStatus == nil,
+				"jobCondition", func() string { if jobStatus != nil { return string(jobStatus.Condition) }; return "nil" }(),
+				"observationNil", observation == nil,
+				"rulesCount", len(instance.Spec.EarlyStoppingRules))
 			if jobStatus != nil && jobStatus.Condition == trialutil.JobRunning && observation != nil {
 				if evaluateEarlyStoppingRules(instance, observation, trainingProgress) {
 					logger.Info("Early stopping rule triggered, stopping trial")
