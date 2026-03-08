@@ -20,22 +20,13 @@
 </div>
 
 <ng-template #content>
-  <!-- Real-time Progress Section (KEP-2779) -->
-  <div class="progress-section" *ngIf="hasTrialsProgress">
-    <div class="progress-row">
-      <app-trials-progress
-        [trialsProgress]="experimentDetails?.status?.trialsProgress"
-        [objectiveType]="experimentDetails?.spec?.objective?.type"
-        class="trials-progress"
-      ></app-trials-progress>
-
-      <app-convergence-chart
-        [trialsProgress]="experimentDetails?.status?.trialsProgress"
-        [objectiveMetricName]="experimentDetails?.spec?.objective?.objectiveMetricName"
-        [objectiveType]="experimentDetails?.spec?.objective?.type"
-        class="convergence-chart"
-      ></app-convergence-chart>
-    </div>
+  <!-- Real-time Convergence Chart (KEP-2779) -->
+  <div class="convergence-section" *ngIf="hasTrialsProgress">
+    <app-convergence-chart
+      [trialsProgress]="experimentDetails?.status?.trialsProgress"
+      [objectiveMetricName]="experimentDetails?.spec?.objective?.objectiveMetricName"
+      [objectiveType]="experimentDetails?.spec?.objective?.type"
+    ></app-convergence-chart>
   </div>
 
   <app-trials-graph-echarts
@@ -73,6 +64,7 @@
           [displayedColumns]="columns"
           [namespace]="namespace"
           [bestTrialName]="bestTrialName"
+          [trialsProgress]="experimentDetails?.status?.trialsProgress"
         ></app-trials-table>
       </mat-tab>
       <mat-tab label="DETAILS">
