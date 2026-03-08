@@ -167,22 +167,32 @@ export class TrialsTableComponent implements OnChanges {
 
   setConfig(displayedColumns: any, processedData: any) {
     const columns = [];
+
+    // Always add Trial Name as first column
+    const trialNameIdx = displayedColumns.findIndex(
+      (c: string) => c === 'Trial name',
+    );
+    if (trialNameIdx >= 0) {
+      columns.push({
+        matHeaderCellDef: 'Trial Name',
+        matColumnDef: 'name',
+        style: { width: '18%' },
+        value: new LinkValue({
+          field: 'link',
+          popoverField: 'trial name',
+          truncate: true,
+          linkType: LinkType.Internal,
+        }),
+        sort: true,
+      });
+    }
+
     for (var i = 0; i < displayedColumns.length; i++) {
-      if (displayedColumns[i] !== 'Kfp run') {
-        if (displayedColumns[i] === 'Trial name') {
-          columns.push({
-            matHeaderCellDef: displayedColumns[i],
-            matColumnDef: 'name',
-            style: { width: '20%' },
-            value: new LinkValue({
-              field: 'link',
-              popoverField: 'trial name',
-              truncate: true,
-              linkType: LinkType.Internal,
-            }),
-            sort: true,
-          });
-        } else if (displayedColumns[i] === 'Status') {
+      if (
+        displayedColumns[i] !== 'Kfp run' &&
+        displayedColumns[i] !== 'Trial name'
+      ) {
+        if (displayedColumns[i] === 'Status') {
           columns.push({
             matHeaderCellDef: displayedColumns[i],
             matColumnDef: displayedColumns[i],
