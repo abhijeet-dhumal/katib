@@ -1,54 +1,8 @@
-<!--
-Copyright 2024 The Kubeflow Authors.
-
-Licensed under the Apache License, Version 2.0 (the "License");
-you may not use this file except in compliance with the License.
-You may obtain a copy of the License at
-
-    http://www.apache.org/licenses/LICENSE-2.0
-
-Unless required by applicable law or agreed to in writing, software
-distributed under the License is distributed on an "AS IS" BASIS,
-WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-See the License for the specific language governing permissions and
-limitations under the License.
--->
-
-<div class="convergence-chart-container">
-  <div class="chart-header">
-    <h3 class="section-title">
-      <mat-icon>show_chart</mat-icon>
-      Real-time Convergence
-    </h3>
-
-    <div class="best-trial" *ngIf="getBestTrial() as best">
-      <mat-icon>star</mat-icon>
-      <span class="label">Best:</span>
-      <span class="trial-name">{{ best.trialName }}</span>
-      <span class="metric-value">{{ best.metricValue?.toFixed(6) }}</span>
-    </div>
-  </div>
-
+<div class="graph-wrapper" *ngIf="trialsProgress?.length > 0 && chartOptions.series">
   <div
-    class="chart-wrapper"
-    *ngIf="trialsProgress?.length > 0 && chartOptions.series"
-  >
-    <div
-      echarts
-      [options]="chartOptions"
-      [initOpts]="initOpts"
-      class="chart"
-    ></div>
-  </div>
-
-  <div
-    class="no-data"
-    *ngIf="!trialsProgress?.length || !chartOptions.series"
-  >
-    <mat-icon>analytics</mat-icon>
-    <span>Waiting for metric data from trials...</span>
-    <p class="hint">
-      Metrics will appear here as trials report their training progress.
-    </p>
-  </div>
+    echarts
+    [options]="chartOptions"
+    [initOpts]="initOpts"
+    class="graph"
+  ></div>
 </div>

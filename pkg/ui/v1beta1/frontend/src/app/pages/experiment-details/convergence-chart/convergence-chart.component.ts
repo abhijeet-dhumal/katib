@@ -173,64 +173,10 @@ export class ConvergenceChartComponent implements OnChanges {
   private formatTooltip(params: any): string {
     if (!params || params.length === 0) return '';
 
-    let html = `<div style="font-weight: 600; margin-bottom: 8px;">Progress: ${params[0].data[0]}%</div>`;
-
+    let html = `Progress: ${params[0].data[0]}%<br/>`;
     params.forEach((param: any) => {
-      const trial = this.trialsProgress.find(
-        t => t.trialName === param.seriesName,
-      );
-      const statusBadge = trial
-        ? `<span style="
-            font-size: 10px;
-            padding: 1px 6px;
-            border-radius: 8px;
-            background: ${this.getStatusColor(trial.status)};
-            color: white;
-            margin-left: 8px;
-          ">${trial.status}</span>`
-        : '';
-
-      html += `
-        <div style="margin: 4px 0;">
-          ${param.marker}
-          <span style="font-weight: 500;">${param.seriesName}</span>
-          ${statusBadge}
-          <span style="float: right; font-family: monospace; margin-left: 16px;">
-            ${param.data[1].toFixed(6)}
-          </span>
-        </div>
-      `;
+      html += `${param.marker} ${param.seriesName}: ${param.data[1].toFixed(6)}<br/>`;
     });
-
     return html;
-  }
-
-  private getStatusColor(status: string): string {
-    switch (status) {
-      case 'Running':
-        return '#1976d2';
-      case 'Succeeded':
-        return '#388e3c';
-      case 'Failed':
-        return '#d32f2f';
-      case 'EarlyStopped':
-        return '#f57c00';
-      default:
-        return '#757575';
-    }
-  }
-
-  getBestTrial(): TrialMetricData | null {
-    const validTrials = this.prepareTrialData();
-    if (validTrials.length === 0) return null;
-
-    return validTrials.reduce((best, current) => {
-      if (!best) return current;
-      if (this.objectiveType === 'minimize') {
-        return current.metricValue! < best.metricValue! ? current : best;
-      } else {
-        return current.metricValue! > best.metricValue! ? current : best;
-      }
-    });
   }
 }

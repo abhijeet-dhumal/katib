@@ -16,18 +16,13 @@ limitations under the License.
 
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { MatIconModule } from '@angular/material/icon';
 import { NgxEchartsModule } from 'ngx-echarts';
 
 import { ConvergenceChartComponent } from './convergence-chart.component';
 
 @NgModule({
   declarations: [ConvergenceChartComponent],
-  imports: [
-    CommonModule,
-    MatIconModule,
-    NgxEchartsModule.forChild(),
-  ],
+  imports: [CommonModule, NgxEchartsModule.forChild()],
   exports: [ConvergenceChartComponent],
 })
 export class ConvergenceChartModule {}
