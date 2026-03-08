@@ -205,9 +205,6 @@ func (r *ReconcileTrial) Reconcile(ctx context.Context, request reconcile.Reques
 						logger.Info("Update trial instance status failed during polling, reconcile requeued", "err", updateErr)
 						return reconcile.Result{Requeue: true}, nil
 					}
-					logger.Info("TrainerStatusCollector: Status updated, requeuing in 5s")
-				} else {
-					logger.Info("TrainerStatusCollector: No status change, requeuing in 5s")
 				}
 				return reconcile.Result{
 					RequeueAfter: time.Second * 5,
@@ -269,11 +266,9 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 			// Always update TrainingProgress (real-time progress)
 			if trainingProgress != nil {
 				instance.Status.TrainingProgress = trainingProgress
-				logger.Info("TrainerStatusCollector: Updated TrainingProgress",
+				logger.V(1).Info("Updated TrainingProgress from TrainJob",
 					"progress", trainingProgress.ProgressPercentage,
 					"metrics", len(trainingProgress.CurrentMetrics))
-			} else {
-				logger.Info("TrainerStatusCollector: No TrainingProgress data from TrainJob")
 			}
 
 			// Always update Observation to track min/max over time
