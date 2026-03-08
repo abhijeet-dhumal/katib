@@ -276,17 +276,18 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 				instance.Status.Observation = observation
 			}
 
+			// Report intermediate metrics to DB for early stopping evaluation
+			// This enables MedianStop to compare trials during training
+			if observation != nil && len(observation.Metrics) > 0 {
+				if err := r.reportObservationToDB(instance, observation); err != nil {
+					logger.V(1).Info("Failed to report intermediate observation to DB", "err", err)
+					// Non-fatal - continue with reconciliation
+				}
+			}
+
 			// If job status not available yet, requeue to poll for updates
 			if jobStatus == nil {
 				return errTrainerStatusPolling
-			}
-
-			// Report final metrics to DB when job completes
-			if (jobStatus.Condition == trialutil.JobSucceeded || instance.IsEarlyStopped()) && observation != nil {
-				if err := r.reportObservationToDB(instance, observation); err != nil {
-					logger.Error(err, "Failed to report observation to DB")
-					// Continue anyway - observation is already in Trial status
-				}
 			}
 
 			// Update Trial job status condition
