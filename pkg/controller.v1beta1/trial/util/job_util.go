@@ -108,9 +108,11 @@ func GetDeployedJobStatus(trial *trialsv1beta1.Trial, deployedJob *unstructured.
 		return trialJobStatus, nil
 	}
 
-	// Set default Job condition is running when Job name is generated.
-	// Check if Trial is not running
-	if !trial.IsRunning() && deployedJob.GetName() != "" {
+	// Job is running if:
+	// 1. Job has a name (was created), AND
+	// 2. No success/failure conditions exist yet
+	// This handles both initial state (!trial.IsRunning) and ongoing running state
+	if deployedJob.GetName() != "" {
 		trialJobStatus.Condition = JobRunning
 		return trialJobStatus, nil
 	}
