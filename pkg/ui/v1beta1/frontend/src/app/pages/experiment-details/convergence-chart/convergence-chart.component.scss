@@ -4,6 +4,8 @@
   align-items: center;
   padding: 16px;
   margin-bottom: 24px;
+  position: relative;
+  overflow: visible;
 }
 
 .stats-row {
@@ -76,10 +78,10 @@
 .graph {
   width: 100%;
   max-width: 1200px;
-  height: 450px;
+  height: 350px;
 
   @media (min-width: 1400px) {
     max-width: 1400px;
-    height: 500px;
+    height: 400px;
   }
 }

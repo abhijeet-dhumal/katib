@@ -10,7 +10,9 @@
 // KEP-2779: Real-time convergence chart section
 .convergence-section {
   margin: 16px 0;
-  max-height: 350px;
+  min-height: 450px;
+  overflow: hidden;
+  position: relative;
 }
 
 // https://github.com/angular/components/issues/9592

@@ -217,15 +217,19 @@ export class ConvergenceChartComponent implements OnChanges {
       },
       legend: {
         data: legendData,
-        bottom: 0,
+        bottom: 5,
         type: 'scroll',
-        textStyle: { fontSize: 11 },
+        textStyle: { fontSize: 10 },
+        pageButtonItemGap: 5,
+        pageButtonGap: 5,
+        itemWidth: 14,
+        itemHeight: 10,
       },
       grid: {
         left: '3%',
         right: '4%',
-        bottom: '12%',
-        top: '12%',
+        bottom: '18%',
+        top: '15%',
         containLabel: true,
       },
       xAxis: {
