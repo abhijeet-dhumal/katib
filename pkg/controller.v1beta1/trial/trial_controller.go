@@ -198,7 +198,14 @@ func (r *ReconcileTrial) Reconcile(ctx context.Context, request reconcile.Reques
 				}, nil
 			}
 			// Requeue every 5s for real-time progress updates during training
+			// But first save the status updates
 			if errors.Is(err, errTrainerStatusPolling) {
+				if !equality.Semantic.DeepEqual(original.Status, instance.Status) {
+					if updateErr := r.updateStatusHandler(instance); updateErr != nil {
+						logger.Info("Update trial instance status failed during polling, reconcile requeued", "err", updateErr)
+						return reconcile.Result{Requeue: true}, nil
+					}
+				}
 				return reconcile.Result{
 					RequeueAfter: time.Second * 5,
 				}, nil
