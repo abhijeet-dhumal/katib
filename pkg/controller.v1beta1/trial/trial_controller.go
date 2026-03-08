@@ -286,6 +286,9 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 			}
 
 			// If job status not available yet, requeue to poll for updates
+			logger.Info("Job status check",
+				"jobStatusNil", jobStatus == nil,
+				"hasMetrics", observation != nil)
 			if jobStatus == nil {
 				return errTrainerStatusPolling
 			}
