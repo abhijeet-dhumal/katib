@@ -205,6 +205,9 @@ func (r *ReconcileTrial) Reconcile(ctx context.Context, request reconcile.Reques
 						logger.Info("Update trial instance status failed during polling, reconcile requeued", "err", updateErr)
 						return reconcile.Result{Requeue: true}, nil
 					}
+					logger.Info("TrainerStatusCollector: Status updated, requeuing in 5s")
+				} else {
+					logger.Info("TrainerStatusCollector: No status change, requeuing in 5s")
 				}
 				return reconcile.Result{
 					RequeueAfter: time.Second * 5,
