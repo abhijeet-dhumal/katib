@@ -103,10 +103,11 @@ export class ConvergenceChartComponent implements OnChanges {
 
   private saveHistoryToStorage(): void {
     try {
-      const data = {
-        history: Object.fromEntries(this.trialHistory),
-        statuses: Object.fromEntries(this.trialStatuses),
-      };
+      const historyObj: { [key: string]: TrialHistoryPoint[] } = {};
+      const statusesObj: { [key: string]: string } = {};
+      this.trialHistory.forEach((v, k) => (historyObj[k] = v));
+      this.trialStatuses.forEach((v, k) => (statusesObj[k] = v));
+      const data = { history: historyObj, statuses: statusesObj };
       sessionStorage.setItem(this.getStorageKey(), JSON.stringify(data));
     } catch (e) {
       console.warn('Failed to save convergence history:', e);
