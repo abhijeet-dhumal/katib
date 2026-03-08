@@ -290,6 +290,24 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 				return errTrainerStatusPolling
 			}
 
+			// Evaluate early stopping rules during training
+			// For TrainerStatusCollector, we handle this in the controller since there's no sidecar
+			if jobStatus != nil && jobStatus.Condition == trialutil.JobRunning && observation != nil {
+				if evaluateEarlyStoppingRules(instance, observation, trainingProgress) {
+					logger.Info("Early stopping rule triggered, stopping trial")
+					msg := "Trial is early stopped by early stopping rule"
+					instance.MarkTrialStatusEarlyStopped(TrialEarlyStoppedReason, msg)
+
+					// Delete the job to stop training
+					if err := r.Delete(context.TODO(), deployedJob); err != nil {
+						logger.Error(err, "Failed to delete job for early stopped trial")
+						return err
+					}
+					r.recorder.Eventf(instance, corev1.EventTypeNormal, TrialEarlyStoppedReason, msg)
+					return nil
+				}
+			}
+
 			// Update Trial job status condition
 			if err := r.UpdateTrialStatusCondition(instance, deployedJob.GetName(), jobStatus); err != nil {
 				return err

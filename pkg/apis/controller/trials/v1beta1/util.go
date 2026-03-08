@@ -179,3 +179,11 @@ func (trial *Trial) MarkTrialStatusMetricsUnavailable(reason, message string) {
 	}
 	trial.setCondition(TrialMetricsUnavailable, v1.ConditionTrue, reason, message)
 }
+
+func (trial *Trial) MarkTrialStatusEarlyStopped(reason, message string) {
+	currentCond := getCondition(trial, TrialRunning)
+	if currentCond != nil {
+		trial.setCondition(TrialRunning, v1.ConditionFalse, currentCond.Reason, currentCond.Message)
+	}
+	trial.setCondition(TrialEarlyStopped, v1.ConditionTrue, reason, message)
+}

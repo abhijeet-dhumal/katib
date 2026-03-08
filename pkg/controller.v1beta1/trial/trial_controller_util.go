@@ -473,6 +473,76 @@ func getMetrics(metricLogs []*api_pb.MetricLog, strategies []commonv1beta1.Metri
 	return observation, nil
 }
 
+// evaluateEarlyStoppingRules checks if any early stopping rule is triggered based on current metrics.
+// Returns true if the trial should be early stopped.
+// This is used by TrainerStatusCollector since it doesn't have a sidecar to evaluate rules.
+func evaluateEarlyStoppingRules(trial *trialsv1beta1.Trial, observation *commonv1beta1.Observation, progress *commonv1beta1.TrainingProgress) bool {
+	if len(trial.Spec.EarlyStoppingRules) == 0 || observation == nil {
+		return false
+	}
+
+	// Get current step from progress (used to check StartStep requirement)
+	currentStep := int32(0)
+	if progress != nil {
+		currentStep = progress.CurrentStep
+		// If CurrentStep not available, estimate from progress percentage
+		if currentStep == 0 && progress.TotalSteps > 0 {
+			currentStep = int32(float64(progress.ProgressPercentage) / 100.0 * float64(progress.TotalSteps))
+		}
+	}
+
+	// Build map of current metrics
+	currentMetrics := make(map[string]float64)
+	for _, metric := range observation.Metrics {
+		if val, err := strconv.ParseFloat(metric.Latest, 64); err == nil {
+			currentMetrics[metric.Name] = val
+		}
+	}
+
+	// Evaluate each rule
+	for _, rule := range trial.Spec.EarlyStoppingRules {
+		// Skip rule if we haven't reached StartStep yet
+		if rule.StartStep > 0 && int(currentStep) < rule.StartStep {
+			continue
+		}
+
+		metricValue, exists := currentMetrics[rule.Name]
+		if !exists {
+			continue
+		}
+
+		ruleValue, err := strconv.ParseFloat(rule.Value, 64)
+		if err != nil {
+			continue
+		}
+
+		// Check if rule is triggered based on comparison type
+		triggered := false
+		switch rule.Comparison {
+		case commonv1beta1.ComparisonTypeGreater:
+			triggered = metricValue > ruleValue
+		case commonv1beta1.ComparisonTypeLess:
+			triggered = metricValue < ruleValue
+		case commonv1beta1.ComparisonTypeEqual:
+			triggered = metricValue == ruleValue
+		}
+
+		if triggered {
+			log.Info("Early stopping rule triggered",
+				"Trial", trial.Name,
+				"Rule", rule.Name,
+				"Comparison", rule.Comparison,
+				"RuleValue", rule.Value,
+				"MetricValue", metricValue,
+				"CurrentStep", currentStep,
+			)
+			return true
+		}
+	}
+
+	return false
+}
+
 func needUpdateFinalizers(trial *trialsv1beta1.Trial) (bool, []string) {
 	deleted := !trial.ObjectMeta.DeletionTimestamp.IsZero()
 	pendingFinalizers := trial.GetFinalizers()

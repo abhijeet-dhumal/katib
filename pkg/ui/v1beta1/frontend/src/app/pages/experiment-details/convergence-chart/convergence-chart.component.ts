@@ -23,13 +23,6 @@ import {
 } from '@angular/core';
 import { TrialProgress } from 'src/app/models/experiment.k8s.model';
 
-interface TrialMetricData {
-  trialName: string;
-  progress: number;
-  metricValue: number | null;
-  status: string;
-}
-
 interface TrialHistoryPoint {
   progress: number;
   metricValue: number;
@@ -52,6 +45,7 @@ export class ConvergenceChartComponent implements OnChanges {
   // Track historical progress for each trial to draw trajectory lines
   private trialHistory: Map<string, TrialHistoryPoint[]> = new Map();
   private trialStatuses: Map<string, string> = new Map();
+  private bestTrial = '';
 
   private colors = [
     '#1976d2',
@@ -64,18 +58,20 @@ export class ConvergenceChartComponent implements OnChanges {
     '#455a64',
   ];
 
-  // Color for pruned/early-stopped trials
   private prunedColor = '#d32f2f';
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes.trialsProgress && this.trialsProgress?.length > 0) {
       this.updateTrialHistory();
+      this.findBestTrial();
       this.updateChart();
     }
   }
 
   private updateTrialHistory(): void {
     this.trialsProgress.forEach(trial => {
+      this.trialStatuses.set(trial.trialName, trial.status);
+
       if (
         trial.currentObjectiveValue === undefined ||
         trial.currentObjectiveValue === null
@@ -86,17 +82,12 @@ export class ConvergenceChartComponent implements OnChanges {
       const metricValue = parseFloat(trial.currentObjectiveValue);
       if (isNaN(metricValue)) return;
 
-      // Update status tracking
-      this.trialStatuses.set(trial.trialName, trial.status);
-
-      // Get or create history for this trial
       let history = this.trialHistory.get(trial.trialName);
       if (!history) {
         history = [];
         this.trialHistory.set(trial.trialName, history);
       }
 
-      // Add point if it's new (different progress or metric value)
       const lastPoint = history[history.length - 1];
       if (
         !lastPoint ||
@@ -111,6 +102,25 @@ export class ConvergenceChartComponent implements OnChanges {
     });
   }
 
+  private findBestTrial(): void {
+    let bestValue: number | null = null;
+    this.trialHistory.forEach((history, trialName) => {
+      if (history.length > 0) {
+        const lastValue = history[history.length - 1].metricValue;
+        if (bestValue === null) {
+          bestValue = lastValue;
+          this.bestTrial = trialName;
+        } else if (this.objectiveType === 'minimize' && lastValue < bestValue) {
+          bestValue = lastValue;
+          this.bestTrial = trialName;
+        } else if (this.objectiveType === 'maximize' && lastValue > bestValue) {
+          bestValue = lastValue;
+          this.bestTrial = trialName;
+        }
+      }
+    });
+  }
+
   private updateChart(): void {
     if (this.trialHistory.size === 0) {
       this.chartOptions = {};
@@ -121,6 +131,8 @@ export class ConvergenceChartComponent implements OnChanges {
     const legend = Array.from(this.trialHistory.keys());
 
     this.chartOptions = {
+      animation: true,
+      animationDuration: 300,
       tooltip: {
         trigger: 'axis',
         formatter: (params: any) => this.formatTooltip(params),
@@ -164,6 +176,10 @@ export class ConvergenceChartComponent implements OnChanges {
           restore: { title: 'Reset' },
         },
       },
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, filterMode: 'none' },
+        { type: 'inside', yAxisIndex: 0, filterMode: 'none' },
+      ],
     };
   }
 
@@ -177,25 +193,23 @@ export class ConvergenceChartComponent implements OnChanges {
         status === 'EarlyStopped' || status === 'Killed' || status === 'Failed';
       const isRunning = status === 'Running';
       const isSucceeded = status === 'Succeeded';
+      const isBest = trialName === this.bestTrial;
 
-      // Determine color based on status
       const baseColor = isPruned
         ? this.prunedColor
         : this.colors[colorIndex % this.colors.length];
 
-      // Convert history to chart data format
       const data = history.map(point => [point.progress, point.metricValue]);
 
-      // Main line series with trajectory
       series.push({
         name: trialName,
         type: 'line',
         smooth: true,
         showSymbol: true,
         symbol: isPruned ? 'circle' : isRunning ? 'circle' : 'emptyCircle',
-        symbolSize: isRunning ? 8 : 6,
+        symbolSize: isBest ? 6 : isRunning ? 5 : 4,
         lineStyle: {
-          width: isRunning ? 3 : 2,
+          width: isBest ? 2 : isRunning ? 1.5 : 1,
           type: isPruned ? 'dashed' : 'solid',
           color: baseColor,
         },
@@ -205,67 +219,19 @@ export class ConvergenceChartComponent implements OnChanges {
           borderWidth: isPruned ? 2 : 1,
         },
         data: data,
+        z: isBest ? 10 : isPruned ? 1 : 5,
         emphasis: {
           focus: 'series',
-          lineStyle: { width: 4 },
+          lineStyle: { width: 2.5 },
         },
-        // Mark the end point for pruned trials with an X
-        markPoint: isPruned
-          ? {
-              symbol: 'circle',
-              symbolSize: 16,
-              data: [
-                {
-                  coord: data[data.length - 1],
-                  itemStyle: {
-                    color: this.prunedColor,
-                    borderColor: '#fff',
-                    borderWidth: 2,
-                  },
-                  label: {
-                    show: true,
-                    formatter: '✕',
-                    fontSize: 10,
-                    fontWeight: 'bold',
-                    color: '#fff',
-                  },
-                },
-              ],
-            }
-          : isRunning
-            ? {
-                symbol: 'pin',
-                symbolSize: 30,
-                data: [
-                  {
-                    coord: data[data.length - 1],
-                    itemStyle: { color: baseColor },
-                  },
-                ],
-              }
-            : isSucceeded
-              ? {
-                  symbol: 'circle',
-                  symbolSize: 12,
-                  data: [
-                    {
-                      coord: data[data.length - 1],
-                      itemStyle: {
-                        color: '#4caf50',
-                        borderColor: '#fff',
-                        borderWidth: 2,
-                      },
-                      label: {
-                        show: true,
-                        formatter: '✓',
-                        fontSize: 10,
-                        fontWeight: 'bold',
-                        color: '#fff',
-                      },
-                    },
-                  ],
-                }
-              : undefined,
+        markPoint: this.getMarkPoint(
+          data,
+          isPruned,
+          isRunning,
+          isSucceeded,
+          isBest,
+          baseColor,
+        ),
       });
 
       if (!isPruned) {
@@ -276,22 +242,116 @@ export class ConvergenceChartComponent implements OnChanges {
     return series;
   }
 
+  private getMarkPoint(
+    data: number[][],
+    isPruned: boolean,
+    isRunning: boolean,
+    isSucceeded: boolean,
+    isBest: boolean,
+    baseColor: string,
+  ): any {
+    if (data.length === 0) return undefined;
+    const lastPoint = data[data.length - 1];
+
+    if (isPruned) {
+      return {
+        symbol: 'circle',
+        symbolSize: 14,
+        data: [
+          {
+            coord: lastPoint,
+            itemStyle: {
+              color: this.prunedColor,
+              borderColor: '#fff',
+              borderWidth: 1,
+            },
+            label: {
+              show: true,
+              formatter: '✕',
+              fontSize: 9,
+              fontWeight: 'bold',
+              color: '#fff',
+            },
+          },
+        ],
+      };
+    }
+
+    if (isRunning) {
+      return {
+        symbol: 'pin',
+        symbolSize: 25,
+        data: [
+          {
+            coord: lastPoint,
+            itemStyle: { color: baseColor },
+            label: {
+              show: true,
+              formatter: (params: any) => params.data.coord[1].toFixed(4),
+              fontSize: 8,
+              color: '#fff',
+            },
+          },
+        ],
+      };
+    }
+
+    if (isSucceeded) {
+      return {
+        symbol: 'circle',
+        symbolSize: isBest ? 12 : 10,
+        data: [
+          {
+            coord: lastPoint,
+            itemStyle: {
+              color: isBest ? '#ffc107' : '#4caf50',
+              borderColor: '#fff',
+              borderWidth: 1,
+            },
+            label: {
+              show: true,
+              formatter: isBest ? '★' : '✓',
+              fontSize: isBest ? 8 : 7,
+              fontWeight: 'bold',
+              color: isBest ? '#000' : '#fff',
+            },
+          },
+        ],
+      };
+    }
+
+    return undefined;
+  }
+
   private formatTooltip(params: any): string {
     if (!params || params.length === 0) return '';
 
-    let html = `Progress: ${params[0].data[0]}%<br/>`;
-    params.forEach((param: any) => {
-      const status = this.trialStatuses.get(param.seriesName) || '';
-      const statusBadge =
-        status === 'EarlyStopped' || status === 'Killed' || status === 'Failed'
-          ? ' <span style="color:#d32f2f">[Pruned]</span>'
-          : status === 'Running'
-            ? ' <span style="color:#1976d2">[Running]</span>'
-            : status === 'Succeeded'
-              ? ' <span style="color:#4caf50">[Completed]</span>'
-              : '';
-      html += `${param.marker} ${param.seriesName}${statusBadge}: ${param.data[1].toFixed(6)}<br/>`;
+    let html = `<b>Progress: ${params[0].data[0]}%</b><br/>`;
+
+    const sortedParams = [...params].sort((a, b) => {
+      const aVal = a.data[1];
+      const bVal = b.data[1];
+      return this.objectiveType === 'minimize' ? aVal - bVal : bVal - aVal;
     });
+
+    sortedParams.forEach((param: any) => {
+      const status = this.trialStatuses.get(param.seriesName) || '';
+      const isBest = param.seriesName === this.bestTrial;
+      const isPruned =
+        status === 'EarlyStopped' || status === 'Killed' || status === 'Failed';
+
+      let badge = '';
+      if (isBest) badge = ' <span style="color:#ffc107">★ Best</span>';
+      else if (isPruned)
+        badge = ' <span style="color:#d32f2f">[Pruned]</span>';
+      else if (status === 'Running')
+        badge = ' <span style="color:#1976d2">[Running]</span>';
+      else if (status === 'Succeeded')
+        badge = ' <span style="color:#4caf50">[Done]</span>';
+
+      html += `${param.marker} ${param.seriesName}${badge}: ${param.data[1].toFixed(6)}<br/>`;
+    });
+
     return html;
   }
 }

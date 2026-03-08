@@ -29,6 +29,7 @@ const (
 	TrialSucceededReason          = "TrialSucceeded"
 	TrialMetricsUnavailableReason = "MetricsUnavailable"
 	TrialFailedReason             = "TrialFailed"
+	TrialEarlyStoppedReason       = "TrialEarlyStopped"
 
 	// For Jobs
 	JobCreatedReason            = "JobCreated"
