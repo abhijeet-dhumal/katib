@@ -206,6 +206,10 @@ type TrialProgress struct {
 
 	// Trial status (Running, Succeeded, Failed, etc.)
 	Status string `json:"status,omitempty"`
+
+	// Current metrics from real-time training progress
+	// These are updated during training, not just at completion
+	CurrentMetrics []Metric `json:"currentMetrics,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true

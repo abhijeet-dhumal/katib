@@ -185,6 +185,7 @@ export interface TrialProgress {
   estimatedRemainingSeconds?: number;
   currentObjectiveValue?: string;
   status: string;
+  currentMetrics?: { name: string; latest: string }[];
 }
 
 // TrainingProgress represents real-time training progress from TrainJob's trainerStatus

@@ -86,6 +86,24 @@ export class TrialsTableComponent implements OnChanges {
       if (progress) {
         row['progress'] = progress.progressPercentage;
         row['eta'] = this.formatEta(progress.estimatedRemainingSeconds);
+
+        // Merge real-time metrics from currentMetrics into table columns
+        // This updates metric columns (loss, eval_loss, train_loss, etc.) during training
+        if (progress.currentMetrics?.length) {
+          progress.currentMetrics.forEach(metric => {
+            const columnName = metric.name.toLowerCase().replace(/_/g, ' ');
+            // Only update if the column exists and current value is empty/undefined
+            if (
+              this.displayedColumns
+                .map(c => c.toLowerCase())
+                .includes(columnName)
+            ) {
+              if (!row[columnName] || row[columnName] === 'Unavailable') {
+                row[columnName] = metric.latest;
+              }
+            }
+          });
+        }
       }
     });
   }
