@@ -56,6 +56,47 @@ func TestConvertToObservationLog(t *testing.T) {
 				},
 			},
 		},
+		"Demo format - mid training with current_step": {
+			trainerStatus: &TrainerStatus{
+				ProgressPercentage:        50,
+				EstimatedRemainingSeconds: 60,
+				LastUpdatedTime:           "2024-03-04T18:30:00Z",
+				Metrics: []Metric{
+					{Name: "loss", Value: "0.12"},
+					{Name: "current_step", Value: "50"},
+					{Name: "total_steps", Value: "100"},
+				},
+			},
+			metricNames: []string{},
+			expected: &v1beta1.ObservationLog{
+				MetricLogs: []*v1beta1.MetricLog{
+					{TimeStamp: "2024-03-04T18:30:00Z", Metric: &v1beta1.Metric{Name: "loss", Value: "0.12"}},
+					{TimeStamp: "2024-03-04T18:30:00Z", Metric: &v1beta1.Metric{Name: "current_step", Value: "50"}},
+					{TimeStamp: "2024-03-04T18:30:00Z", Metric: &v1beta1.Metric{Name: "total_steps", Value: "100"}},
+					{TimeStamp: "2024-03-04T18:30:00Z", Metric: &v1beta1.Metric{Name: "progress_percentage", Value: "50"}},
+					{TimeStamp: "2024-03-04T18:30:00Z", Metric: &v1beta1.Metric{Name: "estimated_remaining_seconds", Value: "60"}},
+				},
+			},
+		},
+		"Demo format - training complete": {
+			trainerStatus: &TrainerStatus{
+				ProgressPercentage:        100,
+				EstimatedRemainingSeconds: 0,
+				LastUpdatedTime:           "2024-03-04T19:30:00Z",
+				Metrics: []Metric{
+					{Name: "train_loss", Value: "0.08"},
+					{Name: "train_runtime", Value: "120.5"},
+				},
+			},
+			metricNames: []string{},
+			expected: &v1beta1.ObservationLog{
+				MetricLogs: []*v1beta1.MetricLog{
+					{TimeStamp: "2024-03-04T19:30:00Z", Metric: &v1beta1.Metric{Name: "train_loss", Value: "0.08"}},
+					{TimeStamp: "2024-03-04T19:30:00Z", Metric: &v1beta1.Metric{Name: "train_runtime", Value: "120.5"}},
+					{TimeStamp: "2024-03-04T19:30:00Z", Metric: &v1beta1.Metric{Name: "progress_percentage", Value: "100"}},
+				},
+			},
+		},
 		"Filter specific metrics": {
 			trainerStatus: &TrainerStatus{
 				ProgressPercentage:        50,
