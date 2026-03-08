@@ -18,15 +18,23 @@ package trainerstatuscollector
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"time"
 
 	"k8s.io/klog/v2"
 
 	v1beta1 "github.com/kubeflow/katib/pkg/apis/manager/v1beta1"
+)
+
+const (
+	// Default path to service account CA certificate
+	defaultCACertPath = "/var/run/secrets/kubernetes.io/serviceaccount/ca.crt"
 )
 
 // TrainerStatus represents the trainerStatus field from TrainJob
@@ -97,7 +105,12 @@ func getTrainerStatus(config CollectorConfig) (*TrainerStatus, error) {
 		req.Header.Set("Authorization", "Bearer "+config.BearerToken)
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	// Create HTTP client with TLS configuration
+	client, err := createHTTPClient(config.CACertPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create HTTP client: %w", err)
+	}
+
 	resp, err := client.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch TrainJob: %w", err)
@@ -115,6 +128,44 @@ func getTrainerStatus(config CollectorConfig) (*TrainerStatus, error) {
 	}
 
 	return trainJob.Status.TrainerStatus, nil
+}
+
+// createHTTPClient creates an HTTP client with proper TLS configuration
+func createHTTPClient(caCertPath string) (*http.Client, error) {
+	if caCertPath == "" {
+		caCertPath = defaultCACertPath
+	}
+
+	// Read CA certificate
+	caCert, err := os.ReadFile(caCertPath)
+	if err != nil {
+		// If CA cert is not available, use insecure client (for development)
+		klog.Warningf("Failed to read CA cert from %s: %v, using insecure TLS", caCertPath, err)
+		return &http.Client{
+			Timeout: 10 * time.Second,
+			Transport: &http.Transport{
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		}, nil
+	}
+
+	// Create cert pool with CA cert
+	caCertPool := x509.NewCertPool()
+	if !caCertPool.AppendCertsFromPEM(caCert) {
+		return nil, fmt.Errorf("failed to add CA cert to pool")
+	}
+
+	// Create TLS config
+	tlsConfig := &tls.Config{
+		RootCAs: caCertPool,
+	}
+
+	return &http.Client{
+		Timeout: 10 * time.Second,
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}, nil
 }
 
 // convertToObservationLog converts TrainerStatus to Katib's ObservationLog format
