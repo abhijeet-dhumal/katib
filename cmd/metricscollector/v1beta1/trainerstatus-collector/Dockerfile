@@ -1,29 +1,24 @@
-# Build the collector binary
-FROM golang:1.22 AS builder
+# Build the Katib TrainerStatus metrics collector.
+FROM golang:alpine AS build-env
 
-WORKDIR /workspace
+ARG TARGETARCH
 
-# Copy go mod files
-COPY go.mod go.mod
-COPY go.sum go.sum
+WORKDIR /go/src/github.com/kubeflow/katib
 
-# Download dependencies
-RUN go mod download
+# Download packages.
+COPY go.mod .
+COPY go.sum .
+RUN go mod download -x
 
-# Copy source code
+# Copy sources.
 COPY cmd/ cmd/
 COPY pkg/ pkg/
 
-# Build
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -o trainerstatus-collector ./cmd/metricscollector/v1beta1/trainerstatus-collector
+# Build the binary.
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=${TARGETARCH} go build -a -o trainerstatus-collector ./cmd/metricscollector/v1beta1/trainerstatus-collector
 
-# Use distroless as minimal base image
-FROM gcr.io/distroless/static:nonroot
-
-WORKDIR /
-
-COPY --from=builder /workspace/trainerstatus-collector .
-
-USER 65532:65532
-
-ENTRYPOINT ["/trainerstatus-collector"]
+# Copy the trainerstatus metrics collector into a thin image.
+FROM alpine:3.15
+WORKDIR /app
+COPY --from=build-env /go/src/github.com/kubeflow/katib/trainerstatus-collector .
+ENTRYPOINT ["./trainerstatus-collector"]
