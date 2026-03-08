@@ -313,17 +313,20 @@ func (s *SidecarInjector) getKatibJob(object *unstructured.Unstructured, namespa
 }
 
 func (s *SidecarInjector) getMetricsCollectorArgs(trial *trialsv1beta1.Trial, metricNames string, mc common.MetricsCollectorSpec, metricsCollectorConfigData configv1beta1.MetricsCollectorConfig, esRules []string) ([]string, error) {
-	args := []string{"-t", trial.Name, "-m", metricNames, "-o-type", string(trial.Spec.Objective.Type), "-s-db", katibmanagerv1beta1.GetDBManagerAddr()}
-
-	// TrainerStatusCollector has different arguments - it watches TrainJob status
+	// TrainerStatusCollector has different arguments - it watches TrainJob status via K8s API
 	if mc.Collector.Kind == common.TrainerStatusCollector {
-		// TrainJob name is the same as Trial name
-		args = append(args, "-trainjob", trial.Name)
-		args = append(args, "-namespace", trial.Namespace)
-		// Default poll interval is 5 seconds
-		args = append(args, "-poll-interval", "5s")
+		args := []string{
+			"-t", trial.Name,
+			"-m", metricNames,
+			"-s-db", katibmanagerv1beta1.GetDBManagerAddr(),
+			"-trainjob", trial.Name,
+			"-namespace", trial.Namespace,
+			"-poll-interval", "5s",
+		}
 		return args, nil
 	}
+
+	args := []string{"-t", trial.Name, "-m", metricNames, "-o-type", string(trial.Spec.Objective.Type), "-s-db", katibmanagerv1beta1.GetDBManagerAddr()}
 
 	if mountPath, _ := getMountPath(mc); mountPath != "" {
 		args = append(args, "-path", mountPath)
