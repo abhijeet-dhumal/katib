@@ -263,9 +263,11 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 			// Always update TrainingProgress (real-time progress)
 			if trainingProgress != nil {
 				instance.Status.TrainingProgress = trainingProgress
-				logger.V(1).Info("Updated TrainingProgress from TrainJob",
+				logger.Info("TrainerStatusCollector: Updated TrainingProgress",
 					"progress", trainingProgress.ProgressPercentage,
 					"metrics", len(trainingProgress.CurrentMetrics))
+			} else {
+				logger.Info("TrainerStatusCollector: No TrainingProgress data from TrainJob")
 			}
 
 			// Always update Observation to track min/max over time
