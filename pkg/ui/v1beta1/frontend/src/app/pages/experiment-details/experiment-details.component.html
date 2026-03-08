@@ -20,15 +20,6 @@
 </div>
 
 <ng-template #content>
-  <!-- Real-time Convergence Chart (KEP-2779) -->
-  <div class="convergence-section" *ngIf="hasTrialsProgress">
-    <app-convergence-chart
-      [trialsProgress]="experimentDetails?.status?.trialsProgress"
-      [objectiveMetricName]="experimentDetails?.spec?.objective?.objectiveMetricName"
-      [objectiveType]="experimentDetails?.spec?.objective?.type"
-    ></app-convergence-chart>
-  </div>
-
   <app-trials-graph-echarts
     *ngIf="showGraph; else emptyGraph"
     [experimentTrialsCsv]="experimentTrialsCsv"
@@ -41,6 +32,15 @@
       Couldn't find any successful Trial.
     </lib-panel>
   </ng-template>
+
+  <!-- Real-time Convergence Chart (KEP-2779) -->
+  <div class="convergence-section" *ngIf="hasTrialsProgress">
+    <app-convergence-chart
+      [trialsProgress]="experimentDetails?.status?.trialsProgress"
+      [objectiveMetricName]="experimentDetails?.spec?.objective?.objectiveMetricName"
+      [objectiveType]="experimentDetails?.spec?.objective?.type"
+    ></app-convergence-chart>
+  </div>
 
   <div class="tab-height-fix">
     <mat-tab-group
