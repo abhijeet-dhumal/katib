@@ -167,7 +167,8 @@ type Observation struct {
 // +k8s:deepcopy-gen=true
 type TrainingProgress struct {
 	// Current progress percentage (0-100)
-	ProgressPercentage int32 `json:"progressPercentage,omitempty"`
+	// Note: not using omitempty to ensure 0% progress is serialized
+	ProgressPercentage int32 `json:"progressPercentage"`
 
 	// Estimated remaining time in seconds (matches TrainJob CRD int64 type)
 	EstimatedRemainingSeconds int64 `json:"estimatedRemainingSeconds,omitempty"`
@@ -194,7 +195,8 @@ type TrialProgress struct {
 	TrialName string `json:"trialName,omitempty"`
 
 	// Current progress percentage (0-100)
-	ProgressPercentage int32 `json:"progressPercentage,omitempty"`
+	// Note: not using omitempty to ensure 0% progress is serialized
+	ProgressPercentage int32 `json:"progressPercentage"`
 
 	// Current objective metric value (e.g., loss or accuracy)
 	CurrentObjectiveValue string `json:"currentObjectiveValue,omitempty"`

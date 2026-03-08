@@ -100,14 +100,17 @@ func updateTrialsSummary(instance *experimentsv1beta1.Experiment, trials *trials
 			trialStatus = "Pending"
 		}
 
-		// Populate TrialsProgress for trials with training progress data
-		if trial.Status.TrainingProgress != nil || trial.IsRunning() {
+		// Populate TrialsProgress for all trials that have progress data or are active
+		if trial.Status.TrainingProgress != nil || trial.IsRunning() || trial.IsSucceeded() || trial.IsFailed() || trial.IsEarlyStopped() {
 			trialProgress := commonv1beta1.TrialProgress{
 				TrialName: trial.Name,
 				Status:    trialStatus,
 			}
 			if trial.Status.TrainingProgress != nil {
 				trialProgress.ProgressPercentage = trial.Status.TrainingProgress.ProgressPercentage
+			} else if trial.IsSucceeded() {
+				// Completed trials should show 100% progress
+				trialProgress.ProgressPercentage = 100
 			}
 			// Get current objective value if available
 			objectiveValue := getObjectiveMetricValue(trial)
