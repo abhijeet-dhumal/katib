@@ -51,6 +51,9 @@ export class TrialsTableComponent implements OnChanges {
 
   processedData = [];
 
+  // Dynamic metric columns discovered from trialsProgress
+  dynamicMetricColumns: string[] = [];
+
   constructor(public dialog: MatDialog, private router: Router) {}
 
   ngOnChanges(changes: SimpleChanges): void {
@@ -62,6 +65,8 @@ export class TrialsTableComponent implements OnChanges {
         0,
         this.displayedColumns.length,
       );
+      // Discover dynamic metric columns from trialsProgress
+      this.discoverDynamicMetricColumns();
       this.processedData = this.setData(this.data, this.displayedColumns);
       this.mergeProgressData();
       this.config = this.setConfig(this.displayedColumns, this.processedData);
@@ -72,6 +77,36 @@ export class TrialsTableComponent implements OnChanges {
         return obj['trial name'] === this.bestTrialName;
       });
     }
+  }
+
+  // Extract unique metric names from all trials' currentMetrics
+  private discoverDynamicMetricColumns(): void {
+    const metricSet = new Set<string>();
+
+    this.trialsProgress?.forEach(progress => {
+      progress.currentMetrics?.forEach(metric => {
+        // Create display-friendly column name
+        const colName = this.formatMetricColumnName(metric.name);
+        metricSet.add(colName);
+      });
+    });
+
+    // Filter out metrics that might already exist in displayedColumns
+    const existingLower = this.displayedColumns.map((c: string) =>
+      c.toLowerCase(),
+    );
+    this.dynamicMetricColumns = Array.from(metricSet).filter(
+      col => !existingLower.includes(col.toLowerCase()),
+    );
+  }
+
+  // Format metric name for display (e.g., "grad_norm" -> "Grad Norm")
+  private formatMetricColumnName(name: string): string {
+    return name
+      .replace(/_/g, ' ')
+      .split(' ')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+      .join(' ');
   }
 
   private mergeProgressData(): void {
@@ -87,21 +122,12 @@ export class TrialsTableComponent implements OnChanges {
         row['progress'] = progress.progressPercentage;
         row['eta'] = this.formatEta(progress.estimatedRemainingSeconds);
 
-        // Merge real-time metrics from currentMetrics into table columns
-        // This updates metric columns (loss, eval_loss, train_loss, etc.) during training
+        // Merge ALL real-time metrics from currentMetrics into row
         if (progress.currentMetrics?.length) {
           progress.currentMetrics.forEach(metric => {
-            const columnName = metric.name.toLowerCase().replace(/_/g, ' ');
-            // Only update if the column exists and current value is empty/undefined
-            if (
-              this.displayedColumns
-                .map(c => c.toLowerCase())
-                .includes(columnName)
-            ) {
-              if (!row[columnName] || row[columnName] === 'Unavailable') {
-                row[columnName] = metric.latest;
-              }
-            }
+            const colName = this.formatMetricColumnName(metric.name);
+            const fieldKey = lowerCase(colName);
+            row[fieldKey] = metric.latest;
           });
         }
       }
@@ -188,7 +214,7 @@ export class TrialsTableComponent implements OnChanges {
       columns.splice(insertIndex, 0, {
         matHeaderCellDef: 'Progress',
         matColumnDef: 'Progress',
-        style: { width: '12%' },
+        style: { width: '8%' },
         value: new PropertyValue({
           field: 'progress',
           valueFn: (row: any) =>
@@ -200,12 +226,40 @@ export class TrialsTableComponent implements OnChanges {
       columns.splice(insertIndex + 1, 0, {
         matHeaderCellDef: 'ETA',
         matColumnDef: 'ETA',
-        style: { width: '10%' },
+        style: { width: '8%' },
         value: new PropertyValue({
           field: 'eta',
           valueFn: (row: any) => row.eta || '--',
         }),
         sort: true,
+      });
+
+      // Add dynamic metric columns from TrainerStatus (after ETA)
+      let metricInsertIndex = insertIndex + 2;
+      this.dynamicMetricColumns.forEach(colName => {
+        const fieldKey = lowerCase(colName);
+        columns.splice(metricInsertIndex, 0, {
+          matHeaderCellDef: colName,
+          matColumnDef: colName,
+          value: new PropertyValue({
+            field: fieldKey,
+            valueFn: (row: any) => {
+              const val = row[fieldKey];
+              if (val === undefined || val === null || val === '') return '--';
+              // Format numbers nicely
+              const num = parseFloat(val);
+              if (!isNaN(num)) {
+                if (Math.abs(num) < 0.0001 || Math.abs(num) >= 10000) {
+                  return num.toExponential(3);
+                }
+                return num.toFixed(4);
+              }
+              return val;
+            },
+          }),
+          sort: true,
+        });
+        metricInsertIndex++;
       });
     }
 
