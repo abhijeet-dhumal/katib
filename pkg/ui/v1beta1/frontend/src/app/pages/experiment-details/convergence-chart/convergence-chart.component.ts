@@ -30,6 +30,11 @@ interface TrialMetricData {
   status: string;
 }
 
+interface TrialHistoryPoint {
+  progress: number;
+  metricValue: number;
+}
+
 @Component({
   selector: 'app-convergence-chart',
   templateUrl: './convergence-chart.component.html',
@@ -44,6 +49,10 @@ export class ConvergenceChartComponent implements OnChanges {
   chartOptions: any = {};
   initOpts = { renderer: 'svg' };
 
+  // Track historical progress for each trial to draw trajectory lines
+  private trialHistory: Map<string, TrialHistoryPoint[]> = new Map();
+  private trialStatuses: Map<string, string> = new Map();
+
   private colors = [
     '#1976d2',
     '#388e3c',
@@ -55,22 +64,61 @@ export class ConvergenceChartComponent implements OnChanges {
     '#455a64',
   ];
 
+  // Color for pruned/early-stopped trials
+  private prunedColor = '#d32f2f';
+
   ngOnChanges(changes: SimpleChanges): void {
     if (changes.trialsProgress && this.trialsProgress?.length > 0) {
+      this.updateTrialHistory();
       this.updateChart();
     }
   }
 
-  private updateChart(): void {
-    const trialData = this.prepareTrialData();
+  private updateTrialHistory(): void {
+    this.trialsProgress.forEach(trial => {
+      if (
+        trial.currentObjectiveValue === undefined ||
+        trial.currentObjectiveValue === null
+      ) {
+        return;
+      }
 
-    if (trialData.length === 0) {
+      const metricValue = parseFloat(trial.currentObjectiveValue);
+      if (isNaN(metricValue)) return;
+
+      // Update status tracking
+      this.trialStatuses.set(trial.trialName, trial.status);
+
+      // Get or create history for this trial
+      let history = this.trialHistory.get(trial.trialName);
+      if (!history) {
+        history = [];
+        this.trialHistory.set(trial.trialName, history);
+      }
+
+      // Add point if it's new (different progress or metric value)
+      const lastPoint = history[history.length - 1];
+      if (
+        !lastPoint ||
+        lastPoint.progress !== trial.progressPercentage ||
+        Math.abs(lastPoint.metricValue - metricValue) > 1e-10
+      ) {
+        history.push({
+          progress: trial.progressPercentage,
+          metricValue: metricValue,
+        });
+      }
+    });
+  }
+
+  private updateChart(): void {
+    if (this.trialHistory.size === 0) {
       this.chartOptions = {};
       return;
     }
 
-    const series = this.createSeries(trialData);
-    const legend = trialData.map(t => t.trialName);
+    const series = this.createSeries();
+    const legend = Array.from(this.trialHistory.keys());
 
     this.chartOptions = {
       tooltip: {
@@ -119,55 +167,113 @@ export class ConvergenceChartComponent implements OnChanges {
     };
   }
 
-  private prepareTrialData(): TrialMetricData[] {
-    return this.trialsProgress
-      .filter(trial => trial.currentObjectiveValue !== undefined)
-      .map(trial => ({
-        trialName: trial.trialName,
-        progress: trial.progressPercentage,
-        metricValue: trial.currentObjectiveValue
-          ? parseFloat(trial.currentObjectiveValue)
-          : null,
-        status: trial.status,
-      }))
-      .filter(t => t.metricValue !== null && !isNaN(t.metricValue));
-  }
+  private createSeries(): any[] {
+    const series: any[] = [];
+    let colorIndex = 0;
 
-  private createSeries(trialData: TrialMetricData[]): any[] {
-    return trialData.map((trial, index) => ({
-      name: trial.trialName,
-      type: 'line',
-      smooth: true,
-      symbol: trial.status === 'Running' ? 'circle' : 'emptyCircle',
-      symbolSize: trial.status === 'Running' ? 10 : 6,
-      lineStyle: {
-        width: trial.status === 'Running' ? 3 : 2,
-        type: trial.status === 'EarlyStopped' ? 'dashed' : 'solid',
-      },
-      itemStyle: {
-        color: this.colors[index % this.colors.length],
-      },
-      data: [[trial.progress, trial.metricValue]],
-      emphasis: {
-        focus: 'series',
-        lineStyle: { width: 4 },
-      },
-      markPoint:
-        trial.status === 'Running'
+    this.trialHistory.forEach((history, trialName) => {
+      const status = this.trialStatuses.get(trialName) || 'Unknown';
+      const isPruned =
+        status === 'EarlyStopped' || status === 'Killed' || status === 'Failed';
+      const isRunning = status === 'Running';
+      const isSucceeded = status === 'Succeeded';
+
+      // Determine color based on status
+      const baseColor = isPruned
+        ? this.prunedColor
+        : this.colors[colorIndex % this.colors.length];
+
+      // Convert history to chart data format
+      const data = history.map(point => [point.progress, point.metricValue]);
+
+      // Main line series with trajectory
+      series.push({
+        name: trialName,
+        type: 'line',
+        smooth: true,
+        showSymbol: true,
+        symbol: isPruned ? 'circle' : isRunning ? 'circle' : 'emptyCircle',
+        symbolSize: isRunning ? 8 : 6,
+        lineStyle: {
+          width: isRunning ? 3 : 2,
+          type: isPruned ? 'dashed' : 'solid',
+          color: baseColor,
+        },
+        itemStyle: {
+          color: baseColor,
+          borderColor: isPruned ? this.prunedColor : baseColor,
+          borderWidth: isPruned ? 2 : 1,
+        },
+        data: data,
+        emphasis: {
+          focus: 'series',
+          lineStyle: { width: 4 },
+        },
+        // Mark the end point for pruned trials with an X
+        markPoint: isPruned
           ? {
+              symbol: 'circle',
+              symbolSize: 16,
               data: [
                 {
-                  coord: [trial.progress, trial.metricValue],
-                  symbol: 'pin',
-                  symbolSize: 30,
+                  coord: data[data.length - 1],
                   itemStyle: {
-                    color: this.colors[index % this.colors.length],
+                    color: this.prunedColor,
+                    borderColor: '#fff',
+                    borderWidth: 2,
+                  },
+                  label: {
+                    show: true,
+                    formatter: '✕',
+                    fontSize: 10,
+                    fontWeight: 'bold',
+                    color: '#fff',
                   },
                 },
               ],
             }
-          : undefined,
-    }));
+          : isRunning
+            ? {
+                symbol: 'pin',
+                symbolSize: 30,
+                data: [
+                  {
+                    coord: data[data.length - 1],
+                    itemStyle: { color: baseColor },
+                  },
+                ],
+              }
+            : isSucceeded
+              ? {
+                  symbol: 'circle',
+                  symbolSize: 12,
+                  data: [
+                    {
+                      coord: data[data.length - 1],
+                      itemStyle: {
+                        color: '#4caf50',
+                        borderColor: '#fff',
+                        borderWidth: 2,
+                      },
+                      label: {
+                        show: true,
+                        formatter: '✓',
+                        fontSize: 10,
+                        fontWeight: 'bold',
+                        color: '#fff',
+                      },
+                    },
+                  ],
+                }
+              : undefined,
+      });
+
+      if (!isPruned) {
+        colorIndex++;
+      }
+    });
+
+    return series;
   }
 
   private formatTooltip(params: any): string {
@@ -175,7 +281,16 @@ export class ConvergenceChartComponent implements OnChanges {
 
     let html = `Progress: ${params[0].data[0]}%<br/>`;
     params.forEach((param: any) => {
-      html += `${param.marker} ${param.seriesName}: ${param.data[1].toFixed(6)}<br/>`;
+      const status = this.trialStatuses.get(param.seriesName) || '';
+      const statusBadge =
+        status === 'EarlyStopped' || status === 'Killed' || status === 'Failed'
+          ? ' <span style="color:#d32f2f">[Pruned]</span>'
+          : status === 'Running'
+            ? ' <span style="color:#1976d2">[Running]</span>'
+            : status === 'Succeeded'
+              ? ' <span style="color:#4caf50">[Completed]</span>'
+              : '';
+      html += `${param.marker} ${param.seriesName}${statusBadge}: ${param.data[1].toFixed(6)}<br/>`;
     });
     return html;
   }

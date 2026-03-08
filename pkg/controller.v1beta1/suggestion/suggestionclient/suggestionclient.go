@@ -120,11 +120,19 @@ func (g *General) SyncAssignments(
 	if err != nil {
 		return err
 	}
-	logger.Info("Getting suggestions", "endpoint", endpoint, "Number of current request parameters", currentRequestNum, "Number of response parameters", len(responseSuggestion.ParameterAssignments))
-	if len(responseSuggestion.ParameterAssignments) != currentRequestNum {
-		err := fmt.Errorf("The response contains unexpected trials")
-		logger.Error(err, "The response contains unexpected trials")
+	responseNum := len(responseSuggestion.ParameterAssignments)
+	logger.Info("Getting suggestions", "endpoint", endpoint, "Number of current request parameters", currentRequestNum, "Number of response parameters", responseNum)
+	// Allow algorithms to return fewer trials than requested (e.g., Hyperband during promotion phase)
+	// Only error if more trials than requested are returned
+	if responseNum > currentRequestNum {
+		err := fmt.Errorf("algorithm returned more trials (%d) than requested (%d)", responseNum, currentRequestNum)
+		logger.Error(err, "The response contains too many trials")
 		return err
+	}
+	// If algorithm returns 0 trials, it might be waiting for more trials to complete (e.g., Hyperband)
+	if responseNum == 0 {
+		logger.Info("Algorithm returned 0 suggestions, may be waiting for trials to complete")
+		return nil
 	}
 
 	earlyStoppingRules := []commonapiv1beta1.EarlyStoppingRule{}
