@@ -61,6 +61,8 @@ var (
 	errMetricsNotReported = fmt.Errorf("metrics are not reported yet")
 	// errReportMetricsFailed is the error when `unavailable` metrics value can't be inserted to the Katib DB.
 	errReportMetricsFailed = fmt.Errorf("failed to report unavailable metrics")
+	// errTrainerStatusPolling triggers requeue for real-time progress updates
+	errTrainerStatusPolling = fmt.Errorf("polling TrainJob status for real-time progress")
 )
 
 // Add creates a new Trial Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
@@ -195,6 +197,12 @@ func (r *ReconcileTrial) Reconcile(ctx context.Context, request reconcile.Reques
 					RequeueAfter: time.Second * 1,
 				}, nil
 			}
+			// Requeue every 5s for real-time progress updates during training
+			if errors.Is(err, errTrainerStatusPolling) {
+				return reconcile.Result{
+					RequeueAfter: time.Second * 5,
+				}, nil
+			}
 			logger.Error(err, "Reconcile trial error")
 			r.recorder.Eventf(instance,
 				corev1.EventTypeWarning, consts.ReconcileErrorReason,
@@ -278,8 +286,11 @@ func (r *ReconcileTrial) reconcileTrial(instance *trialsv1beta1.Trial) error {
 				return err
 			}
 
-			// No need for periodic polling - the TrainJob watch triggers reconciliation
-			// when TrainJob.status changes (including trainerStatus updates)
+			// Requeue while job is running for real-time progress updates
+			// TrainJob watch may not trigger for every trainerStatus change
+			if jobStatus.Condition == trialutil.JobRunning {
+				return errTrainerStatusPolling
+			}
 			return nil
 		}
 
