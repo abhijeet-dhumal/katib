@@ -207,7 +207,7 @@ func (r *ReconcileTrial) Reconcile(ctx context.Context, request reconcile.Reques
 					}
 				}
 				return reconcile.Result{
-					RequeueAfter: time.Second * 5,
+					RequeueAfter: time.Second * 2,
 				}, nil
 			}
 			logger.Error(err, "Reconcile trial error")
