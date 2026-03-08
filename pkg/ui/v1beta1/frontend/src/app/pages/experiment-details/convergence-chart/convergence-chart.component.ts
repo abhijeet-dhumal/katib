@@ -93,8 +93,22 @@ export class ConvergenceChartComponent implements OnChanges {
       const stored = sessionStorage.getItem(this.getStorageKey());
       if (stored) {
         const data = JSON.parse(stored);
-        this.trialHistory = new Map(Object.entries(data.history || {}));
-        this.trialStatuses = new Map(Object.entries(data.statuses || {}));
+        const storedTrials = Object.keys(data.history || {});
+        const currentTrials = this.trialsProgress.map(t => t.trialName);
+
+        // Check if stored data matches current experiment
+        // If any current trial is not in stored data, it's a new experiment run
+        const isNewRun = currentTrials.some(t => !storedTrials.includes(t));
+
+        if (isNewRun) {
+          // Clear old data for new experiment run
+          this.trialHistory = new Map();
+          this.trialStatuses = new Map();
+          sessionStorage.removeItem(this.getStorageKey());
+        } else {
+          this.trialHistory = new Map(Object.entries(data.history || {}));
+          this.trialStatuses = new Map(Object.entries(data.statuses || {}));
+        }
       }
     } catch (e) {
       console.warn('Failed to load convergence history:', e);
