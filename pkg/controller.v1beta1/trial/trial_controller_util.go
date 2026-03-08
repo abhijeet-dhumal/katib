@@ -211,8 +211,9 @@ func getTrainingProgress(metricLogs []*api_pb.MetricLog) *commonv1beta1.Training
 		})
 	}
 
-	// Only return if we have progress data
-	if progress.ProgressPercentage > 0 || progress.LastUpdatedTime != "" {
+	// Return progress if we have any data (including 0% progress)
+	// Check for meaningful data: timestamp set, metrics collected, or explicitly set progress
+	if progress.LastUpdatedTime != "" || len(progress.CurrentMetrics) > 0 || progress.TotalSteps > 0 {
 		return progress
 	}
 	return nil
