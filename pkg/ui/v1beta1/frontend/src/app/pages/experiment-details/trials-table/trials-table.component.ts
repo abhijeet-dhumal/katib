@@ -85,13 +85,12 @@ export class TrialsTableComponent implements OnChanges {
 
     this.trialsProgress?.forEach(progress => {
       progress.currentMetrics?.forEach(metric => {
-        // Create display-friendly column name
         const colName = this.formatMetricColumnName(metric.name);
         metricSet.add(colName);
       });
     });
 
-    // Filter out metrics that might already exist in displayedColumns
+    // Filter out metrics that already exist in displayedColumns
     const existingLower = this.displayedColumns.map((c: string) =>
       c.toLowerCase(),
     );

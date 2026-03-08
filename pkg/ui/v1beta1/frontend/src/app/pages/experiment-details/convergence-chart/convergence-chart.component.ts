@@ -42,29 +42,74 @@ export class ConvergenceChartComponent implements OnChanges {
   chartOptions: any = {};
   initOpts = { renderer: 'svg' };
 
+  // Stats for display
+  runningCount = 0;
+  succeededCount = 0;
+  prunedCount = 0;
+  bestTrialName = '';
+  bestTrialValue = '';
+
   // Track historical progress for each trial to draw trajectory lines
   private trialHistory: Map<string, TrialHistoryPoint[]> = new Map();
   private trialStatuses: Map<string, string> = new Map();
   private bestTrial = '';
+  private storageKey = 'katib-convergence-history';
 
   private colors = [
-    '#1976d2',
-    '#388e3c',
-    '#f57c00',
-    '#7b1fa2',
-    '#c2185b',
-    '#00796b',
-    '#5d4037',
-    '#455a64',
+    '#2196f3', // Blue
+    '#4caf50', // Green
+    '#ff9800', // Orange
+    '#9c27b0', // Purple
+    '#00bcd4', // Cyan
+    '#e91e63', // Pink
+    '#795548', // Brown
+    '#607d8b', // Blue Grey
   ];
 
-  private prunedColor = '#d32f2f';
+  private prunedColor = '#f44336';
 
   ngOnChanges(changes: SimpleChanges): void {
     if (changes.trialsProgress && this.trialsProgress?.length > 0) {
+      this.loadHistoryFromStorage();
       this.updateTrialHistory();
       this.findBestTrial();
       this.updateChart();
+      this.saveHistoryToStorage();
+    }
+  }
+
+  private getStorageKey(): string {
+    // Use experiment name from first trial to create unique key
+    if (this.trialsProgress?.length > 0) {
+      const parts = this.trialsProgress[0].trialName.split('-');
+      parts.pop(); // Remove trial suffix
+      return `${this.storageKey}-${parts.join('-')}`;
+    }
+    return this.storageKey;
+  }
+
+  private loadHistoryFromStorage(): void {
+    try {
+      const stored = sessionStorage.getItem(this.getStorageKey());
+      if (stored) {
+        const data = JSON.parse(stored);
+        this.trialHistory = new Map(Object.entries(data.history || {}));
+        this.trialStatuses = new Map(Object.entries(data.statuses || {}));
+      }
+    } catch (e) {
+      console.warn('Failed to load convergence history:', e);
+    }
+  }
+
+  private saveHistoryToStorage(): void {
+    try {
+      const data = {
+        history: Object.fromEntries(this.trialHistory),
+        statuses: Object.fromEntries(this.trialStatuses),
+      };
+      sessionStorage.setItem(this.getStorageKey(), JSON.stringify(data));
+    } catch (e) {
+      console.warn('Failed to save convergence history:', e);
     }
   }
 
@@ -104,6 +149,21 @@ export class ConvergenceChartComponent implements OnChanges {
 
   private findBestTrial(): void {
     let bestValue: number | null = null;
+    this.runningCount = 0;
+    this.succeededCount = 0;
+    this.prunedCount = 0;
+
+    this.trialStatuses.forEach((status, trialName) => {
+      if (status === 'Running') this.runningCount++;
+      else if (status === 'Succeeded') this.succeededCount++;
+      else if (
+        status === 'EarlyStopped' ||
+        status === 'Killed' ||
+        status === 'Failed'
+      )
+        this.prunedCount++;
+    });
+
     this.trialHistory.forEach((history, trialName) => {
       if (history.length > 0) {
         const lastValue = history[history.length - 1].metricValue;
@@ -119,6 +179,9 @@ export class ConvergenceChartComponent implements OnChanges {
         }
       }
     });
+
+    this.bestTrialName = this.bestTrial;
+    this.bestTrialValue = bestValue !== null ? bestValue.toExponential(3) : '--';
   }
 
   private updateChart(): void {
@@ -128,50 +191,60 @@ export class ConvergenceChartComponent implements OnChanges {
     }
 
     const series = this.createSeries();
-    const legend = Array.from(this.trialHistory.keys());
+    const legendData = this.createLegendData();
 
     this.chartOptions = {
       animation: true,
       animationDuration: 300,
+      title: {
+        text: 'Real-Time Training Convergence',
+        left: 'center',
+        top: 5,
+        textStyle: { fontSize: 16, fontWeight: 'bold' },
+      },
       tooltip: {
         trigger: 'axis',
+        backgroundColor: 'rgba(50, 50, 50, 0.9)',
+        borderColor: '#333',
+        textStyle: { color: '#fff', fontSize: 12 },
         formatter: (params: any) => this.formatTooltip(params),
       },
       legend: {
-        data: legend,
+        data: legendData,
         bottom: 0,
         type: 'scroll',
+        textStyle: { fontSize: 11 },
       },
       grid: {
         left: '3%',
         right: '4%',
-        bottom: '15%',
-        top: '10%',
+        bottom: '12%',
+        top: '12%',
         containLabel: true,
       },
       xAxis: {
         type: 'value',
-        name: 'Progress (%)',
+        name: 'Training Progress (%)',
         nameLocation: 'middle',
-        nameGap: 30,
+        nameGap: 28,
         min: 0,
         max: 100,
-        splitLine: {
-          lineStyle: { type: 'dashed' },
-        },
+        axisLine: { lineStyle: { color: '#999' } },
+        splitLine: { lineStyle: { type: 'dashed', color: '#e0e0e0' } },
       },
       yAxis: {
         type: 'value',
         name: this.objectiveMetricName,
         nameLocation: 'middle',
-        nameGap: 50,
-        splitLine: {
-          lineStyle: { type: 'dashed' },
-        },
+        nameGap: 45,
+        axisLine: { lineStyle: { color: '#999' } },
+        splitLine: { lineStyle: { type: 'dashed', color: '#e0e0e0' } },
       },
       series,
       toolbox: {
+        right: 20,
         feature: {
+          dataZoom: { title: { zoom: 'Zoom', back: 'Reset' } },
           saveAsImage: { title: 'Save' },
           restore: { title: 'Reset' },
         },
@@ -181,6 +254,20 @@ export class ConvergenceChartComponent implements OnChanges {
         { type: 'inside', yAxisIndex: 0, filterMode: 'none' },
       ],
     };
+  }
+
+  private createLegendData(): any[] {
+    return Array.from(this.trialHistory.keys()).map(trialName => {
+      const status = this.trialStatuses.get(trialName) || 'Unknown';
+      const isPruned =
+        status === 'EarlyStopped' || status === 'Killed' || status === 'Failed';
+      const isBest = trialName === this.bestTrial;
+
+      return {
+        name: trialName,
+        icon: isPruned ? 'circle' : isBest ? 'diamond' : 'roundRect',
+      };
+    });
   }
 
   private createSeries(): any[] {
@@ -204,25 +291,26 @@ export class ConvergenceChartComponent implements OnChanges {
       series.push({
         name: trialName,
         type: 'line',
-        smooth: true,
+        smooth: 0.3,
         showSymbol: true,
         symbol: isPruned ? 'circle' : isRunning ? 'circle' : 'emptyCircle',
-        symbolSize: isBest ? 6 : isRunning ? 5 : 4,
+        symbolSize: isBest ? 8 : isRunning ? 7 : 5,
         lineStyle: {
-          width: isBest ? 2 : isRunning ? 1.5 : 1,
+          width: isBest ? 3 : isRunning ? 2.5 : 2,
           type: isPruned ? 'dashed' : 'solid',
           color: baseColor,
         },
         itemStyle: {
           color: baseColor,
-          borderColor: isPruned ? this.prunedColor : baseColor,
+          borderColor: isPruned ? '#fff' : baseColor,
           borderWidth: isPruned ? 2 : 1,
         },
         data: data,
         z: isBest ? 10 : isPruned ? 1 : 5,
         emphasis: {
           focus: 'series',
-          lineStyle: { width: 2.5 },
+          lineStyle: { width: 4 },
+          itemStyle: { borderWidth: 3 },
         },
         markPoint: this.getMarkPoint(
           data,
@@ -256,19 +344,19 @@ export class ConvergenceChartComponent implements OnChanges {
     if (isPruned) {
       return {
         symbol: 'circle',
-        symbolSize: 14,
+        symbolSize: 22,
         data: [
           {
             coord: lastPoint,
             itemStyle: {
               color: this.prunedColor,
               borderColor: '#fff',
-              borderWidth: 1,
+              borderWidth: 2,
             },
             label: {
               show: true,
               formatter: '✕',
-              fontSize: 9,
+              fontSize: 12,
               fontWeight: 'bold',
               color: '#fff',
             },
@@ -280,15 +368,18 @@ export class ConvergenceChartComponent implements OnChanges {
     if (isRunning) {
       return {
         symbol: 'pin',
-        symbolSize: 25,
+        symbolSize: 35,
         data: [
           {
             coord: lastPoint,
             itemStyle: { color: baseColor },
             label: {
               show: true,
-              formatter: (params: any) => params.data.coord[1].toFixed(4),
-              fontSize: 8,
+              formatter: (params: any) => {
+                const val = params.data.coord[1];
+                return val < 0.001 ? val.toExponential(1) : val.toFixed(3);
+              },
+              fontSize: 9,
               color: '#fff',
             },
           },
@@ -299,19 +390,19 @@ export class ConvergenceChartComponent implements OnChanges {
     if (isSucceeded) {
       return {
         symbol: 'circle',
-        symbolSize: isBest ? 12 : 10,
+        symbolSize: isBest ? 20 : 16,
         data: [
           {
             coord: lastPoint,
             itemStyle: {
               color: isBest ? '#ffc107' : '#4caf50',
               borderColor: '#fff',
-              borderWidth: 1,
+              borderWidth: 2,
             },
             label: {
               show: true,
               formatter: isBest ? '★' : '✓',
-              fontSize: isBest ? 8 : 7,
+              fontSize: isBest ? 12 : 10,
               fontWeight: 'bold',
               color: isBest ? '#000' : '#fff',
             },

@@ -1,8 +1,35 @@
-<div class="graph-wrapper" *ngIf="trialsProgress?.length > 0 && chartOptions.series">
-  <div
-    echarts
-    [options]="chartOptions"
-    [initOpts]="initOpts"
-    class="graph"
-  ></div>
+<div class="convergence-container" *ngIf="trialsProgress?.length > 0">
+  <!-- Stats Summary -->
+  <div class="stats-row">
+    <div class="stat running" *ngIf="runningCount > 0">
+      <span class="icon">●</span>
+      <span class="value">{{ runningCount }}</span>
+      <span class="label">Running</span>
+    </div>
+    <div class="stat succeeded" *ngIf="succeededCount > 0">
+      <span class="icon">✓</span>
+      <span class="value">{{ succeededCount }}</span>
+      <span class="label">Completed</span>
+    </div>
+    <div class="stat pruned" *ngIf="prunedCount > 0">
+      <span class="icon">✕</span>
+      <span class="value">{{ prunedCount }}</span>
+      <span class="label">Pruned</span>
+    </div>
+    <div class="stat best" *ngIf="bestTrialName">
+      <span class="icon">★</span>
+      <span class="value">{{ bestTrialValue }}</span>
+      <span class="label">Best {{ objectiveMetricName }}</span>
+    </div>
+  </div>
+
+  <!-- Chart -->
+  <div class="graph-wrapper" *ngIf="chartOptions.series">
+    <div
+      echarts
+      [options]="chartOptions"
+      [initOpts]="initOpts"
+      class="graph"
+    ></div>
+  </div>
 </div>
