@@ -162,6 +162,47 @@ type Observation struct {
 	Metrics []Metric `json:"metrics,omitempty"`
 }
 
+// TrainingProgress represents real-time training progress from TrainJob's trainerStatus.
+// This enables Katib to display live progress for trials using Kubeflow Trainer.
+// +k8s:deepcopy-gen=true
+type TrainingProgress struct {
+	// Current progress percentage (0-100)
+	ProgressPercentage int32 `json:"progressPercentage,omitempty"`
+
+	// Estimated remaining time in seconds
+	EstimatedRemainingSeconds int32 `json:"estimatedRemainingSeconds,omitempty"`
+
+	// Current training step/iteration
+	CurrentStep int32 `json:"currentStep,omitempty"`
+
+	// Total training steps/iterations
+	TotalSteps int32 `json:"totalSteps,omitempty"`
+
+	// Last time the progress was updated
+	LastUpdatedTime string `json:"lastUpdatedTime,omitempty"`
+
+	// Current training metrics (e.g., loss, accuracy)
+	// +listType=map
+	// +listMapKey=name
+	CurrentMetrics []Metric `json:"currentMetrics,omitempty"`
+}
+
+// TrialProgress represents training progress for a single trial in an experiment.
+// +k8s:deepcopy-gen=true
+type TrialProgress struct {
+	// Name of the trial
+	TrialName string `json:"trialName,omitempty"`
+
+	// Current progress percentage (0-100)
+	ProgressPercentage int32 `json:"progressPercentage,omitempty"`
+
+	// Current objective metric value (e.g., loss or accuracy)
+	CurrentObjectiveValue string `json:"currentObjectiveValue,omitempty"`
+
+	// Trial status (Running, Succeeded, Failed, etc.)
+	Status string `json:"status,omitempty"`
+}
+
 // +k8s:deepcopy-gen=true
 type MetricsCollectorSpec struct {
 	Source    *SourceSpec    `json:"source,omitempty"`
@@ -232,6 +273,10 @@ const (
 	// When model training source code persists metrics into persistent layer
 	// directly, sidecar container isn't in need, and its kind is "pushCollector"
 	PushCollector CollectorKind = "Push"
+
+	// TrainerStatusCollector collects metrics from TrainJob's trainerStatus field.
+	// This enables real-time progress tracking for Kubeflow Trainer jobs.
+	TrainerStatusCollector CollectorKind = "TrainerStatus"
 
 	MetricsVolume = "metrics-volume"
 )

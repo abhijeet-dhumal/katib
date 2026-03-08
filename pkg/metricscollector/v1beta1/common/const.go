@@ -59,5 +59,6 @@ var (
 		v1beta1common.TfEventCollector,
 		v1beta1common.FileCollector,
 		v1beta1common.PrometheusMetricCollector,
+		v1beta1common.TrainerStatusCollector,
 	}
 )

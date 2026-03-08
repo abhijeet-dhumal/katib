@@ -23,6 +23,8 @@ runtime:
       resources:
         limits:
           memory: 1Gi
+    - kind: TrainerStatus
+      image: ghcr.io/kubeflow/katib/trainerstatus-metrics-collector:latest
   suggestions:
     - algorithmName: random
       image: ghcr.io/kubeflow/katib/suggestion-hyperopt:latest

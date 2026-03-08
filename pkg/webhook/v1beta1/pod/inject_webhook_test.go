@@ -478,6 +478,25 @@ func TestGetMetricsCollectorArgs(t *testing.T) {
 				"-s-db", katibDBAddress,
 			},
 		},
+		"TrainerStatus MC": {
+			trial:       testTrial,
+			metricNames: testMetricName,
+			mCSpec: common.MetricsCollectorSpec{
+				Collector: &common.CollectorSpec{
+					Kind: common.TrainerStatusCollector,
+				},
+			},
+			katibConfig: configv1beta1.MetricsCollectorConfig{},
+			wantArgs: []string{
+				"-t", testTrialName,
+				"-m", testMetricName,
+				"-o-type", string(testObjective),
+				"-s-db", katibDBAddress,
+				"-trainjob", testTrialName,
+				"-namespace", testNamespace,
+				"-poll-interval", "5s",
+			},
+		},
 		"Trial with EarlyStopping rules": {
 			trial:       testTrial,
 			metricNames: testMetricName,

@@ -94,6 +94,10 @@ type TrialStatus struct {
 
 	// Results of the Trial - objectives and other metrics values.
 	Observation *common.Observation `json:"observation,omitempty"`
+
+	// Real-time training progress from TrainJob's trainerStatus.
+	// Only populated when using TrainerStatus metrics collector with Kubeflow Trainer.
+	TrainingProgress *common.TrainingProgress `json:"trainingProgress,omitempty"`
 }
 
 // +k8s:deepcopy-gen=true

@@ -138,6 +138,12 @@ type ExperimentStatus struct {
 
 	// How many trials are currently metrics unavailable.
 	TrialMetricsUnavailable int32 `json:"trialMetricsUnavailable,omitempty"`
+
+	// Real-time training progress for all running trials.
+	// Populated when using TrainerStatus metrics collector with Kubeflow Trainer.
+	// +listType=map
+	// +listMapKey=trialName
+	TrialsProgress []common.TrialProgress `json:"trialsProgress,omitempty"`
 }
 
 // OptimalTrial is the metrics and assignments of the best trial.

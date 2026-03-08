@@ -182,6 +182,11 @@ func (in *TrialStatus) DeepCopyInto(out *TrialStatus) {
 		*out = new(commonv1beta1.Observation)
 		(*in).DeepCopyInto(*out)
 	}
+	if in.TrainingProgress != nil {
+		in, out := &in.TrainingProgress, &out.TrainingProgress
+		*out = new(commonv1beta1.TrainingProgress)
+		(*in).DeepCopyInto(*out)
+	}
 	return
 }
 

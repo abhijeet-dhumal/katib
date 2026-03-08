@@ -167,6 +167,9 @@ func (s *SidecarInjector) Mutate(pod *v1.Pod, namespace string) (*v1.Pod, error)
 		return mutatedPod, nil
 	}
 
+	// TrainerStatusCollector watches TrainJob status via K8s API, not shared process namespace
+	isTrainerStatusCollector := trial.Spec.MetricsCollector.Collector.Kind == common.TrainerStatusCollector
+
 	// Create metrics sidecar container spec
 	injectContainer, err := s.getMetricsCollectorContainer(trial, pod)
 	if err != nil {
@@ -179,8 +182,11 @@ func (s *SidecarInjector) Mutate(pod *v1.Pod, namespace string) (*v1.Pod, error)
 		return nil, err
 	}
 
-	isShareProcessNamespace := true
-	mutatedPod.Spec.ShareProcessNamespace = &isShareProcessNamespace
+	// TrainerStatusCollector doesn't need shared process namespace - it watches TrainJob status via K8s API
+	if !isTrainerStatusCollector {
+		isShareProcessNamespace := true
+		mutatedPod.Spec.ShareProcessNamespace = &isShareProcessNamespace
+	}
 
 	mountPath, pathKind := getMountPath(trial.Spec.MetricsCollector)
 	if mountPath != "" {
@@ -308,6 +314,17 @@ func (s *SidecarInjector) getKatibJob(object *unstructured.Unstructured, namespa
 
 func (s *SidecarInjector) getMetricsCollectorArgs(trial *trialsv1beta1.Trial, metricNames string, mc common.MetricsCollectorSpec, metricsCollectorConfigData configv1beta1.MetricsCollectorConfig, esRules []string) ([]string, error) {
 	args := []string{"-t", trial.Name, "-m", metricNames, "-o-type", string(trial.Spec.Objective.Type), "-s-db", katibmanagerv1beta1.GetDBManagerAddr()}
+
+	// TrainerStatusCollector has different arguments - it watches TrainJob status
+	if mc.Collector.Kind == common.TrainerStatusCollector {
+		// TrainJob name is the same as Trial name
+		args = append(args, "-trainjob", trial.Name)
+		args = append(args, "-namespace", trial.Namespace)
+		// Default poll interval is 5 seconds
+		args = append(args, "-poll-interval", "5s")
+		return args, nil
+	}
+
 	if mountPath, _ := getMountPath(mc); mountPath != "" {
 		args = append(args, "-path", mountPath)
 	}
