@@ -108,6 +108,7 @@ func updateTrialsSummary(instance *experimentsv1beta1.Experiment, trials *trials
 			}
 			if trial.Status.TrainingProgress != nil {
 				trialProgress.ProgressPercentage = trial.Status.TrainingProgress.ProgressPercentage
+				trialProgress.EstimatedRemainingSeconds = trial.Status.TrainingProgress.EstimatedRemainingSeconds
 			} else if trial.IsSucceeded() {
 				// Completed trials should show 100% progress
 				trialProgress.ProgressPercentage = 100

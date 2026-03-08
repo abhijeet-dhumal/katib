@@ -198,6 +198,9 @@ type TrialProgress struct {
 	// Note: not using omitempty to ensure 0% progress is serialized
 	ProgressPercentage int32 `json:"progressPercentage"`
 
+	// Estimated time remaining in seconds
+	EstimatedRemainingSeconds int64 `json:"estimatedRemainingSeconds,omitempty"`
+
 	// Current objective metric value (e.g., loss or accuracy)
 	CurrentObjectiveValue string `json:"currentObjectiveValue,omitempty"`
 

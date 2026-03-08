@@ -182,6 +182,7 @@ interface CurrentOptimalTrial {
 export interface TrialProgress {
   trialName: string;
   progressPercentage: number;
+  estimatedRemainingSeconds?: number;
   currentObjectiveValue?: string;
   status: string;
 }

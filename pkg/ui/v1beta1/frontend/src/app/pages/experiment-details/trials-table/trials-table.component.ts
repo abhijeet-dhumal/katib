@@ -85,9 +85,7 @@ export class TrialsTableComponent implements OnChanges {
       const progress = progressMap.get(trialName);
       if (progress) {
         row['progress'] = progress.progressPercentage;
-        row['eta'] = this.formatEta(
-          (progress as any).estimatedRemainingSeconds,
-        );
+        row['eta'] = this.formatEta(progress.estimatedRemainingSeconds);
       }
     });
   }
